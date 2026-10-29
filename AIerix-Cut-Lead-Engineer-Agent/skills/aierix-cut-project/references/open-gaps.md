@@ -96,7 +96,7 @@ items below need **no new model**.
 | 2 | **Normalised edge feather with gamma** | `blur_kernel_size / 100` → `inputEdgeSmooth` 0..1; separable 43-tap gaussian, `sigma 4`, `gamma 1.4` before and `1/1.4` after; collapses to 5 taps at 8× when `edgeSmooth < 0.2` | **DONE 2026-10-26** — `MattingSettings.feather` (0..1 normalized; done **without** the gamma-1.4 weighting — its direction was not verified, doc §11) + `MaskPostProcess.gaussianFeather` (3-box O(N)); `نرمی لبه` slider | **P0 ✅** (gamma) |
 | 3 | **Reverse selection** (keep background instead of subject) | `matting.reverse` (`boolean`) + `enable_reverse` → `mask = 1 - mask` at the end of the chain | **DONE 2026-10-26** — `MattingSettings.reverse` + `MaskPostProcess.invert` as the chain's last pass; `معکوس` toggle | **P0 ✅** |
 | 4 | **One shared post-process used by every consumer** | the mask is published as a single texture (`addUserTexture("#MattingMask")`) and every later stage reads it | **DONE 2026-10-26** — moved from generation-time to **composition-time**: `MaskPostProcess` (pure JVM) → `MaskBitmaps` (Bitmap bridge) → `AiExportHooks.maskFor` applies the chain on the raw sidecar mask at its native resolution, before the single rescale. Sliders persist immediately and take effect on the next export **without a re-run** — the parity property behind the "mask as algorithm layer" architecture. (The *preview* does not composite the mask at all — that is a pre-existing, separately tracked approximation, not a regression of this change.) | **P0 ✅** |
-| 5 | **Temporal model for video** (`frashevery 15` + GRU) | `ai_matting_gru` graph (`forwardtype -1`, `model_name tt_matting_video_gru`) next to `ai_matting` (`forwardtype 0`); `matting_mp_frashevery = 15` | EMA over masks (α = 0.65), 10 fps sidecar | **P1** (biggest remaining quality gap) |
+| 5 | **Temporal model for video** (`frashevery 15` + GRU) | `ai_matting_gru` graph (`forwardtype -1`, `model_name tt_matting_video_gru`) next to `ai_matting` (`forwardtype 0`); `matting_mp_frashevery = 15` | **PARTIAL 2026-10-29** — the *statistical* half is done without any new weights: `ai/MattingTemporalFilter.kt` replaces the fixed `TEMPORAL_ALPHA = 0.65` EMA with a median of three (a one-frame measurement is discarded, not dimmed) plus a scene-cut reset at 0.35 mean mask change. What remains is the actual recurrence: a GRU that knows what "the same subject" looks like across occlusions and re-entry. No model, no schedule. | **P1** (the learned half) |
 | 6 | **Atomic undo for "apply mask + new background"** | `DraftComboParams("image_editor_matting_apply")` / `("image_editor_matting_cancel")` | history exists, but mask + background are separate steps | **P1** |
 | 7 | **Interactive brush / eraser (VOS)** | `custom_matting` graph (`mobile_vos`, `mobile_vos_input_mask_type 1`), `AddCustomMattingReqStruct(brush_type, brush_size, brush_points)`, `LVVEMattingPenType` = fast 1 / general 2 / eraser 4 / fasteraser 8 (bitmask) | **absent** | **P2** (needs a VOS model) |
 | 8 | **Non-portrait modes** (object / saliency / head / pet / tag) | 5 more graphs: `ai_matting_video_object` + `_preview`, `saliency_matting`, `tag_matting`, `camera_matting`; `MATTING_TYPE_{SALIENCY,FACE,HEAD,FOLLOW,COMBINE,EXTRA}` | person only (Selfie Multiclass) | **P2** (needs models) |
@@ -150,6 +150,32 @@ selector with a «حذف» chip + an honest hint that the live playback
 preview does not composite and the result appears in the export (doc
 §16). Legacy `ORIGINAL` blobs stay pass-through *until* the user
 re-runs the button — then they flip to TRANSPARENT.
+
+**2026-10-29 — the temporal filter and the analysis bound.** Two changes, both
+without new weights:
+
+* **`TEMPORAL_ALPHA = 0.65` is gone.** It was one line and could not be
+  retuned: slow enough to damp noise meant a one-frame false positive became a
+  0.65-alpha ghost that decayed over ~0.5 s, and fast enough to follow motion
+  meant a trailing edge. `ai/MattingTemporalFilter.kt` now takes the median of
+  `(current, prev, prev2)` — a one-frame measurement is a minority of three and
+  is **discarded**, a persistent one is reproduced **exactly** on the second
+  frame — and resets the history when the frame changes by ≥ 0.35 (a cut).
+  There is deliberately **no EMA on top**: the first cut of the class had one,
+  and `MattingTemporalFilterTest` caught it turning the median's one-frame lag
+  into a four-frame fade (1.0 → 0.3 → 0.09). Consequence: the emitted mask is
+  binary again, so soft edges come from the composition-time feather only.
+* **`ANALYSIS_MAX_SIDE` 720 → 512.** The model ingests 256×256, so 720 was
+  waste. 512 is the smallest round bound that keeps a 16:9 frame's **short**
+  side (288) at or above the model's 256 input, so the segmenter downsamples
+  instead of stretching a starved frame up. The `~320` previously suggested in
+  `docs/REAL_DEVICE_AI_TRIPLE_FIX_2026-10-23.md` §7 would give a 180-pixel short
+  side and was rejected for that reason. Halves the per-frame pixel count
+  (147k vs 291k). Pinned by `AiMattingEngineTest`.
+
+**Both are unverified on a device** — none was attached on 2026-10-29. The
+compile is green and 20 JVM tests pass; the visual result (ghost removal, cut
+handling, edge fidelity at 512) still needs a real clip.
 
 **Do not** treat items 1–3 as "implement when the new model lands". They are the
 cheapest visible win we have, and they are *independent* of the model.

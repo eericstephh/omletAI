@@ -335,9 +335,10 @@ class MediaPipeMattingEngine @Inject constructor(
                 uri = videoUri,
                 intervalMs = intervalMs,
                 maxFrames = sampleCount,
-                // The segmenter ingests 256x256; keeping the working frame
-                // near ANALYSIS_MAX_SIDE bounds the YUV->ARGB conversion
-                // without touching the model's effective input.
+                // Bounds the decoded frame so the YUV->ARGB conversion,
+                // the input scale and the temporal pass all work on
+                // ~half the pixels of the old 720 bound, while keeping
+                // the short side at or above the model's 256 input.
                 maxSide = ANALYSIS_MAX_SIDE,
                 isCancelled = { ownerJob?.isActive == false }
             ) { frame ->
@@ -700,11 +701,13 @@ class MediaPipeMattingEngine @Inject constructor(
      * single resample to the frame it composites).
      *
      * The input is uniformly scaled down to at most
-     * [ANALYSIS_MAX_SIDE] on the longer side before inference. The
-     * selfie-multiclass model itself ingests 256×256, so this only
-     * bounds the mask/EMA working size — never the model's
-     * effective input — while cutting the decode→tensor conversion,
-     * per-frame float arrays, and PNG compression cost proportionally.
+     * [ANALYSIS_MAX_SIDE] on the longer side before inference. That cap is
+     * chosen so the **short** side stays at or above
+     * [MODEL_INPUT_SIDE] for any aspect ratio up to 2:1 — the model gets
+     * to downsample rather than upscale — while cutting the
+     * decode→tensor conversion, the per-frame float arrays, the temporal
+     * pass and the PNG compression cost roughly in half. (The old value,
+     * 720, was pure waste: the model ingests 256×256 either way.)
      *
      * The selfie-multiclass category mask holds per-pixel class
      * indices (0 = background, 1..5 = person-part classes: hair,
@@ -712,7 +715,7 @@ class MediaPipeMattingEngine @Inject constructor(
      * foreground so the whole silhouette stays, which makes the raw
      * mask **binary** — every pixel is 0 or 1, never a probability.
      * Temporal stabilisation is [MattingTemporalFilter] (median of
-     * three → adaptive EMA → scene-cut reset); 2026-10-25: the
+     * three → scene-cut reset); 2026-10-25: the
      * feather/expansion/reverse post-process moved out of this
      * function entirely — it now runs at composition time.
      */
@@ -815,16 +818,39 @@ class MediaPipeMattingEngine @Inject constructor(
         private const val TAG = "MediaPipeMattingEngine"
 
         /**
-         * Cap on the analysis side length. The selfie-multiclass model
-         * ingests 256×256 regardless, so this only bounds the EMA,
-         * feather, and PNG-write working surfaces (a 4K frame would
-         * otherwise allocate ~33 MB of mask + temp buffers per sample).
-         * The sidecar PNG keeps this resolution; the export pre-render
-         * bilinearly rescales each PNG to the frame it composites —
-         * one resample, the same single resample the old full-
-         * resolution path performed at engine time.
+         * Cap on the **longer** side of the working frame.
+         *
+         * 2026-10-29 — lowered from 720 to 512, which is the smallest
+         * round value that still guarantees the model its own input
+         * resolution. The reasoning, because "smaller is faster" is not
+         * sufficient on its own:
+         *
+         * The model ingests 256×256. A 16:9 source capped at 512 on the
+         * long side becomes 512×288, so the **short** side (288) is still
+         * above the model's 256 — the model supersamples rather than
+         * upscales. Capping at the ~320 suggested in
+         * `docs/REAL_DEVICE_AI_TRIPLE_FIX_2026-10-23.md` §7 would produce
+         * 320×180 for the same clip, i.e. a short side of **180 below the
+         * model's 256 input**, so the segmenter would stretch a
+         * vertically-starved frame up to 256. That is a real, if small,
+         * loss of mask fidelity, and it is why 320 was rejected.
+         *
+         * 512 halves the pixel count of the old 720×405 (147k vs 291k):
+         * that is the YUV→ARGB conversion, the input scale, the temporal
+         * filter pass and the PNG write, all per sampled frame. At 10 fps
+         * over a 36 s clip that is 358 frames.
+         *
+         * The invariant is pinned by
+         * `AiMattingEngineTest.analysis bound keeps the short side at the model input`.
          */
-        const val ANALYSIS_MAX_SIDE: Int = 720
+        const val ANALYSIS_MAX_SIDE: Int = 512
+
+        /**
+         * The selfie-multiclass model's square input. [ANALYSIS_MAX_SIDE]
+         * is chosen so the working frame's *short* side never falls below
+         * this for any aspect ratio up to 2:1.
+         */
+        const val MODEL_INPUT_SIDE: Int = 256
 
         /**
          * Number of frames sampled per clip. 10 fps over a 60 s

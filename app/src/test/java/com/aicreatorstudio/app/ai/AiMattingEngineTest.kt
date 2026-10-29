@@ -69,6 +69,25 @@ class AiMattingEngineTest {
     }
 
     @Test
+    fun `analysis bound keeps the short side at the model input`() {
+        // 2026-10-29 — the bound was lowered 720 -> 512. The whole point of
+        // the specific value is that a 16:9 frame stays at or above the
+        // model's 256x256 input on its SHORT side, so the segmenter
+        // downsamples instead of stretching a starved frame up. Lowering
+        // this to the "~320" once suggested in the device-fix doc would
+        // give a 180-pixel short side and lose mask fidelity.
+        val maxSide = MediaPipeMattingEngine.ANALYSIS_MAX_SIDE
+        val shortAt16x9 = maxSide * 9 / 16
+        assertTrue(
+            "16:9 short side was $shortAt16x9, model input is " +
+                "${MediaPipeMattingEngine.MODEL_INPUT_SIDE}",
+            shortAt16x9 >= MediaPipeMattingEngine.MODEL_INPUT_SIDE
+        )
+        // And it must be a real reduction, not a rename of 720.
+        assertTrue("bound was $maxSide", maxSide in 320..719)
+    }
+
+    @Test
     fun `frame cap keeps the sidecar bounded`() {
         val cap = MediaPipeMattingEngine.MAX_FRAMES
         assertTrue("cap was $cap", cap in 60..3600)
