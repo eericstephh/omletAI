@@ -109,6 +109,17 @@ object MaskPostProcess {
     /**
      * Runs the full chain in place on [alpha] (row-major 0..1 floats,
      * `w×h`). Returns [alpha] for fluency.
+     *
+     * @param shortSideOverride the short side the normalized knobs are
+     *   mapped against. `null` (the default) uses `min(w, h)`, which is
+     *   right whenever the array *is* the mask. Callers that process a
+     *   mask at a different resolution than they composite at pass their
+     *   own value so the look stays resolution-independent.
+     *
+     *   2026-10-29 — this parameter is new here. `MaskBitmaps` had a
+     *   `shortSideOverride` of its own that it computed and then **never
+     *   passed on**, so the KDoc promised resolution-independent scaling
+     *   that the code did not do. It is wired through now.
      */
     fun apply(
         alpha: FloatArray,
@@ -116,10 +127,11 @@ object MaskPostProcess {
         h: Int,
         expansion: Float,
         feather: Float,
-        reverse: Boolean
+        reverse: Boolean,
+        shortSideOverride: Int? = null
     ): FloatArray {
         if (w <= 0 || h <= 0) return alpha
-        val shortSide = minOf(w, h)
+        val shortSide = shortSideOverride ?: minOf(w, h)
         val radius = expansionRadiusPx(expansion, shortSide)
         if (radius > 0) {
             if (expansion > 0f) {

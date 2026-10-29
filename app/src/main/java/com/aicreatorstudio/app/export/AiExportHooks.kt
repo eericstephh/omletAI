@@ -383,6 +383,12 @@ class AiExportHooks @Inject constructor(
                 s.feather.coerceIn(0f, 1f),
                 s.reverse
             )
+            // 2026-10-29 — applyPostProcess returns a NEW bitmap now (it
+            // used to mutate the caller's, which threw
+            // `IllegalStateException: Cannot modify a immutable bitmap`
+            // because `decoded` comes from BitmapFactory and is
+            // immutable). The decoded original is dead after this point.
+            if (processed !== decoded) decoded.recycle()
         }
         val sized = if (processed.width == w && processed.height == h) processed
         else {
