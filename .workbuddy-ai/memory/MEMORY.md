@@ -2,64 +2,58 @@
 
 `com.aicreatorstudio.app` · src root `app/src/main/java/com/aicreatorstudio/app/`
 
-**Load the narrowest source first.** Export/effect internals → `reference/architecture.md`; shipped
-features → `reference/features.md`; AI frames / decoder / Whisper → `reference/ai-media-decode.md`;
-Media3 → `media3-export-parity` skill; Atlas maps → `aierix-cut-project` skill; history →
-`.memory/2026-*.md`; long-form → `docs/`.
+**Load the narrowest source first.** Export/effect → `reference/architecture.md`; shipped features →
+`reference/features.md`; AI frames/decoder/Whisper → `reference/ai-media-decode.md`; Media3 →
+`media3-export-parity` skill; Atlas maps → `aierix-cut-project` skill; history → `.memory/2026-*.md`.
 
 ## Build & test
 
-**Git since 2026-10-29** (`96f0f73` baseline) — `git diff` before claiming what changed; older work
-has no history. `local.properties` (release signing passwords) and `app/ai-models/**/*.bin` are
-ignored on purpose.
+**Git since 2026-10-29** (`96f0f73`) — `git diff` before claiming what changed. `local.properties`
+(release signing passwords) and `app/ai-models/**/*.bin` are ignored on purpose.
 
-`./gradlew <task> --offline` from Bash, keep `--offline`. Full procedure — JDK-21 fallback, stale-test
-parking, APK verification, signing, adb gotchas → **`reference/build-and-apk.md`**.
+`./gradlew <task> --offline` from Bash, keep `--offline`. Procedure → **`reference/build-and-apk.md`**.
 
-- ~3000 tests, 3–6 min → background it; grep the log for `^e:` / `BUILD`.
-- Never-chase baseline: `RealModelInstallTest`, `WhisperNativeSymbolsTest`, `WhisperLargeV3LockfileTest`.
-- ⚠️ `compileDebugUnitTestKotlin` is RED since 2026-09-21 (stale Whisper tests) — park them in
+- ~3000 tests, 3–6 min → background; grep `^e:` / `BUILD`. Release builds are 5–9 min → pass
+  `timeout: 600000`, never the 120 s default.
+- Never-chase: `RealModelInstallTest`, `WhisperNativeSymbolsTest`, `WhisperLargeV3LockfileTest`.
+- ⚠️ `compileDebugUnitTestKotlin` RED since 2026-09-21 (stale Whisper tests) — park in
   `build/tmp/stale-tests/`, run, restore. `assembleDebug` unaffected.
-- ⚠️ `assembleDebug`/`assembleRelease` as a **separate invocation** from tests, and **`rm` the APK
-  first** (incremental `package` keeps dead bytes). Verify by mtime + DEX grep.
-- ⚠️ Gradle daemon + `--offline` survives long runs; a release build is ~5–9 min, so never use the
-  default 120 s foreground timeout — pass `timeout: 600000`.
+- ⚠️ Build as a **separate invocation** from tests, and **`rm` the APK first** (incremental `package`
+  keeps dead bytes). Verify by mtime + DEX grep.
 
 ## Verifying an APK
 
-`zipalign -c 4`, `apksigner verify`, `aapt2 dump badging`, `unzip -l` — all from Bash, build-tools
-**35.0.0**. No `strings` → unzip `classes*.dex` and `grep -a`. ⚠️ `classes17.dex` is a third-party GL
-library with zero app classes; our code is in `classes3/11.dex`.
+`zipalign -c 4`, `apksigner verify`, `aapt2 dump badging`, `unzip -l` from Bash, build-tools **35.0.0**.
+No `strings` → unzip `classes*.dex`, `grep -a`; our code is in `classes3/11.dex` (`classes17.dex` is a
+third-party GL lib with zero app classes).
 
-**Deobfuscating a crash stack:** `app/build/outputs/mapping/release/mapping.txt` is written by every
-release build — `grep "^[^ ].* -> b5\.b0:$"` maps a frame to its real class in one step. Do this
-instead of guessing; lambda frames (`…$foo$2`) are always obfuscated even when the class is kept.
+**Deobfuscating a crash stack:** `app/build/outputs/mapping/release/mapping.txt` ships with every
+release build — `grep "^[^ ].* -> b5\.b0:$"` maps a frame in one step. Lambda frames are always
+obfuscated even when the class is kept.
 
 ## Highest-value traps
 
 - **A missing import is the #1 cascade cause** — add it, recompile, *then* diagnose. `private const val`
-  cannot sit between imports; a literal `*/` inside a KDoc silently ends the comment.
+  cannot sit between imports; a literal `*/` in a KDoc silently ends the comment.
 - **A wrong KDoc teaches the wrong invariant** — verify by grepping the **consumers**.
 - **A forwarded-only parameter eventually stops being forwarded** (`fade` on `StemClip`, `motionTrack`
   in `RoomProjectRepository`, `voiceEffect` in `AudioMixerPlayer`'s key list, `shortSideOverride` in
   `MaskBitmaps`). New per-clip field → grep every construction site *and* every cache-key list.
-- ⚠️ **Decoded bitmaps are immutable.** `BitmapFactory.decode*` returns a bitmap whose `setPixels`
-  throws `IllegalStateException` — copy first (`copy(ARGB_8888, true)`) and recycle the original.
-  Bit us on 2026-10-29: the mask post-process wrote into the decoded sidecar PNG, so every export with
-  a non-zero slider died at PREPARING behind the message "Video processing failed".
-- ⚠️ **A fast path hides the broken slow path.** `isNoOp`-style early returns mean the defect only
-  fires in the branch no test exercises. When a function has two paths, test the expensive one.
-- **Tests: JUnit4 + coroutines-test + org.json only.** Hilt VMs can't be built in JVM → pure top-level
-  fn in `model/`, or a **source-shape test**. ⚠️ A ONE-LINE `/** … */` makes a line-oriented stripper
+- ⚠️ **Decoded bitmaps are immutable** — `BitmapFactory.decode*` → `setPixels` throws
+  `IllegalStateException`. `copy(ARGB_8888, true)` first, recycle the original. Cost us 2026-10-29:
+  every export with a non-zero matting slider died at PREPARING behind "Video processing failed".
+- ⚠️ **A fast path hides the broken slow path** — `isNoOp` early returns put the defect where no test
+  looks. When a function has two paths, test the expensive one.
+- **Tests: JUnit4 + coroutines-test + org.json only.** Hilt VMs can't build in JVM → pure top-level fn
+  in `model/`, or a **source-shape test**. ⚠️ A ONE-LINE `/** … */` makes a line-oriented stripper
   swallow to the next `*/`; the copies in `CustomFontWiringTest`, `SubtitleEditingWorkflowTest`,
   `ProgressBarWiringTest`, `NativeEngineFailureWiringTest`, `OverlayMaskWiringTest`,
   `AudioLaneLifecycleWiringTest` must agree. On failure **grep the RAW file** first.
 - ⚠️ **Stale closures in long-lived `DisposableEffect`s** are the most-repeated bug class (a 33 ms
   poller read a captured `isPlaying` and hard-paused playback). Read via
-  `rememberUpdatedState(...).value`; a state the effect must *write* needs
-  `var x by remember { mutableStateOf(...) }`.
+  `rememberUpdatedState(...).value`; a state the effect must *write* needs `by remember { mutableStateOf }`.
 - ⚠️ **Media3 audio lanes are 16-bit, always** — `SonicAudioProcessor.configure` throws on
-  non-`PCM_16BIT` and converters sit at the pipeline **head only**. `javap -c` the shipped class.
+  non-`PCM_16BIT`, and converters sit at the pipeline **head only**. `javap -c` the shipped class.
 - ⚠️ **MediaPipe JNI**: `tasks-vision` ships no `.so`; the only lib is `tasks-core`'s
   `libmediapipe_tasks_jni.so`, shared by both engines via `ai/MediaPipeNativeLib.kt`.
 - ⚠️ **`AiToolRegistry` resolves engines from the Hilt `List<AiToolEngine>`** in
@@ -68,12 +62,12 @@ instead of guessing; lambda frames (`…$foo$2`) are always obfuscated even when
 - ⚠️ **`models.lock.json` exists twice** (`app/ai-models/` is truth; `assets/` regenerated by
   `preBuild`). `"bundled": false` = never packaged. `BundledAssetIntegrityTest` asserts they agree.
 - ⚠️ **`unitTests.isReturnDefaultValues = true`** makes `android.*` inert (`Rect`/`Bundle` → `0`) —
-  tests can pass for the wrong reason. Plain floats for geometry.
-- ⚠️ **Adding a ctor dep to a `@HiltViewModel` breaks its JVM test** — grep `app/src/test` for
-  `ViewModel(` first; use interface + `Default…` + `InMemory…` fake in `di/AppBindings.kt`.
+  tests pass for the wrong reason. Plain floats for geometry.
+- ⚠️ **A new ctor dep on a `@HiltViewModel` breaks its JVM test** — grep `app/src/test` for `ViewModel(`
+  first; interface + `Default…` + `InMemory…` fake in `di/AppBindings.kt`.
 - ⚠️ Confirm the composable holds `viewModel` before wiring `viewModel.*`; `…Content` functions are
-  callback-driven. Never put a fixed-size child in a weighted Compose slot (`Modifier.weight` is a
-  scope extension → private composables need a pass-through `modifier`).
+  callback-driven. Never put a fixed-size child in a weighted Compose slot (`Modifier.weight` is a scope
+  extension → private composables need a pass-through `modifier`).
 - ⚠️ **Do NOT call `setVideoEffects` at construction** (killed playback). Colour goes to the
   `TextureView` layer paint, never a Compose draw modifier on the `AndroidView`. `RgbMatrix` = 4×4
   column-major.
@@ -88,82 +82,40 @@ instead of guessing; lambda frames (`…$foo$2`) are always obfuscated even when
   (`updateSelectedTextFont`); mismatch shows **only in the export**.
 - **Parity is safe only when STRUCTURAL** — one shared pure function feeding both renderers.
 - Compose `PathFillType` has no inverse; `android.graphics.Path` has `INVERSE_EVEN_ODD`. Preview
-  knockout needs `CompositingStrategy.Offscreen` + `BlendMode.DstOut`. A `remember` that can return
-  `null` must be called unconditionally.
-- ⚠️ **Matting is composited at export only** — the preview shows the untouched clip, so a user who
-  ran the pass sees "it doesn't work". Known, documented, unfixed.
+  knockout needs `CompositingStrategy.Offscreen` + `BlendMode.DstOut`.
+- ⚠️ **Matting composites at export only** — the preview shows the untouched clip, so a user who ran
+  the pass sees "it doesn't work". Known, unfixed.
 
-## Canvas / display dimensions (2026-09-30)
+## Dimensions, IA, persistence
 
-One owner per step: `model/VideoDimensions.resolve(...)` (coded-frame → display swap; probe is ground
-truth for orientation only) → `CanvasPreset.forSourceDimensions` (import) →
-`ExportFrame.resolveOutputSize(...)` (encoder size; never upscaled, always even). Every canvas default
-is `FREE`; every `ExportQuality` is landscape — never use `quality.widthPx` as an aspect source.
-Preview has exactly **one** `.aspectRatio(...)`; `EditorVideoCanvas.kt` is dead code.
+→ **`reference/editor-ia.md`** — canvas sizing chain (one owner per step), the contextual-toolbar chip
+counts pinned by `ContextualToolbarSpecTest`, `SubPanelHeight` clamps, the **paired-audio invariant**
+(every mutator of `project.clips` must also touch the `AudioClip` with that `originVideoClipId`, or the
+"Video Audio" lane drifts — `setClipTrim`/`setClipSpeed` are still uncovered), and the `aiToolsJson`
+per-clip persistence checklist (`toVideoProject` omission is bug class 1).
 
-## Editor toolbar / IA (shipped 2026-09-28)
+## AI media
 
-`ContextualToolbar` ← `EditorBottomDockSection` driven by `ContextualToolbarSpec` +
-`model/EditorContext.kt`; chrome forced **LTR**. `ContextualToolbarSpecTest` pins the root row =
-**exactly 8** flat chips, ≤ 8 Persian chars per label, no panel twice per context. Audio chips = **6**;
-clip row = **17**; +transitions = **18**. «هوشمند» is the one remaining sheet: 11 panels (autoframe,
-matting, motion_track, ocr, voice_clean, voice_enhance, silence_cut, reframe, beat_sync, highlights,
-upscale).
-
-**Paired-audio invariant.** Every mutator of `project.clips` must also touch the `AudioClip` whose
-`originVideoClipId` is that clip, or the "Video Audio" lane drifts one step behind (three bugs in one
-day: split / delete / duplicate). Covered: `splitClip`, `splitAudioClip`, `deleteClip`,
-`duplicateClip`, `updateClipPosition`. **Not covered: `setClipTrim`, `setClipSpeed`** (needs a
-source-time vs timeline-time decision). Persist **both** tables: `persistClips()` +
-`persistProjectMeta()`. Guarded by `AudioLaneLifecycleWiringTest`. Still open: `audioClips` never
-reaches `RenderGraphBuilder`.
-
-## AI media (sampling, decoder lifecycle, subtitles)
-
-→ **`reference/ai-media-decode.md`** — read it before touching `ai/media/`, `ai/engines/`, `ai/ocr/`,
-`ai/upscale/`, `ai/audio/`, `ai/subtitle/`.
-
-Four rules that abort the process rather than throw (pinned by `AiFrameDecodeLifecycleTest`):
+→ **`reference/ai-media-decode.md`** before touching `ai/media/`, `ai/engines/`, `ai/ocr/`,
+`ai/upscale/`, `ai/audio/`, `ai/subtitle/`. Four rules that abort the process rather than throw
+(`AiFrameDecodeLifecycleTest`):
 
 - **Never render an EOS output** — `releaseOutputBuffer(st, !eos)`. A rendered EOS buffer yields an
-  `Image` with no gralloc buffer, and the lazy `planes[0]` then trips CheckJNI (`non-zero capacity for
-  nullptr pointer`), which no `try/catch` can catch.
+  `Image` with no gralloc buffer; the lazy `planes[0]` trips CheckJNI (`non-zero capacity for nullptr
+  pointer`), which no `try/catch` catches.
 - **Convert → close the `Image` → then run the AI op.** `onFrame` suspends for seconds against a 3-slot
   reader; holding the `Image` lets the driver reclaim it.
 - **`acquireNextImage()` blocks** (never returns null) — gate it on a `pendingImages` counter.
 - **No GL call without a current EGL context** — `glGetString` on a worker thread is a SIGSEGV.
 
-Also there: `SequentialFrameSampler` is mandatory for frame analysis (never `OPTION_CLOSEST_SYNC`),
-and the seven Whisper defects behind the Persian accuracy work (`logprob_thold = -1.0` because the
-temperature ladder's last rung is accepted unconditionally; natural-text primer; AA resampling;
-conditioning; window planning; cross-window carry).
-
 ## Matting mask (2026-10-29)
 
-- **The category mask is binary** — `cls == 0 → 0f else 1f`. There is no soft knee and never was;
-  partial alpha came only from the old EMA. Soft edges are the composition-time feather
-  (`MaskPostProcess`).
+- **The category mask is binary** — `cls == 0 → 0f else 1f`. No soft knee, ever; partial alpha came
+  only from the old EMA. Soft edges are the composition-time feather (`MaskPostProcess`).
 - **`ai/MattingTemporalFilter.kt`** = median of three + scene-cut reset at 0.35. **Do not add an EMA on
-  top** — it turns the median's one-frame lag into a multi-frame fade; `MattingTemporalFilterTest`
-  catches it. When a filter has already discarded a value, do not average the result.
-- **`ANALYSIS_MAX_SIDE = 512`, not 320.** 320 gives a 16:9 short side of 180, *below* the model's 256
-  input → the segmenter upscales. The test `analysis bound keeps the short side at the model input`
-  pins it.
-- **`MaskBitmaps.applyPostProcess` is pure in / new buffer out** (`copy(ARGB_8888, true)`); the caller
-  recycles the decoded PNG. Guarded by `MaskBitmapsMutabilityTest`.
-
-## Sub-panel sizing (2026-10-01)
-
-`model/SubPanelHeight.kt` (`resolveHeightDp`, `kindFor`, `Kind`) — pure floats, JVM-testable.
-`availableDp` is the **post-chrome** height from `BoxWithConstraints` inside `SubPanelRow`;
-`(available × fraction).coerceIn(min,max).coerceAtMost(available − 180)` — the last clamp **wins**.
-COMPACT is an allow-list of exactly 11 (`SubPanelHeightTest`); everything else → GALLERY.
-`SubPanelContent` needs `uiState.copy(toolPanel = panel)` because it dispatches on `uiState.toolPanel`.
-
-## Per-clip persistence — `ClipAiTools` is the carrier
-
-Per-clip settings ride the **`aiToolsJson`** blob (no Room migration). A new field touches, in order:
-the clip model, `db/EditorStateJson.kt` (field + `aiToolsToJson`/`FromJson` **and** the audio
-variants), `db/RoomProjectRepository.kt`'s `toVideoProject` (⚠️ omitting it is bug class 1 — how
-`motionTrack` was lost), `EditorViewModel`'s `toClipAiTools()`, `export/RenderSegment.kt` +
-`RenderGraphBuilder`. **Append params last**; write only when non-default.
+  top** — it turns the median's one-frame lag into a multi-frame fade (`MattingTemporalFilterTest`
+  catches it). Once a filter has discarded a value, do not average the result.
+- **`ANALYSIS_MAX_SIDE = 512`, not 320** — 320 gives a 16:9 short side of 180, *below* the model's 256
+  input, so the segmenter upscales. Pinned by `analysis bound keeps the short side at the model input`.
+- **`MaskBitmaps.applyPostProcess` is pure in / new buffer out**; the caller recycles the decoded PNG.
+  Guarded by `MaskBitmapsMutabilityTest`.
