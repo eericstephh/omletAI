@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- Splash screen palette. Mirror the Compose-side tokens so the
+         system splash (drawn before Compose is up) looks identical to
+         the in-app splash that follows it. -->
+    <color name="splash_background">#FF090A0F</color>
+    <color name="splash_logo_tint">#FFFFFFFF</color>
+</resources>

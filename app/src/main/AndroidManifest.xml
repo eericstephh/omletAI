@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Needed to download the offline AI subtitle model on first use. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- 2026-09-16 Tapsell Mediation interstitial ads — required by the SDK. -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="com.google.android.gms.permission.AD_ID" />
+
+    <!-- Video import: READ_MEDIA_VIDEO is requested at runtime on API 33+;
+         READ_EXTERNAL_STORAGE is the equivalent fallback below API 33.
+         Neither is needed when the system Photo Picker is available, since
+         it grants access to the picked file without this permission. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
+    <!-- 2026-10-21 — «نریشن» (Voiceover): recording a narration track
+         straight onto the timeline. The permission is requested at
+         runtime, and only when the user actually taps the record
+         button — the app never records on its own. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- 2026-10-22 — the export runs in a foreground service, so it
+         survives the user leaving the app (it used to die with the
+         editor's ViewModel scope).
+
+         `POST_NOTIFICATIONS` is what makes the progress notification
+         visible on API 33+; without the grant the export still runs,
+         the notification is just not shown.
+
+         2026-10-24 — THE EXPORT WAS DEAD ON ANDROID 14. Three separate
+         manifest facts are needed, and only one of them was here:
+
+         - `FOREGROUND_SERVICE` (API 28+) — the comment used to claim it
+           was "declared above", but it was not, so `startForeground`
+           would have thrown `SecurityException` on every API 28+ device;
+         - the type has to exist in the **running** framework. The build
+           targets 35, and `mediaProcessing` is an API 35 type: on
+           Android 14 the package manager dropped the it as unknown and
+           the service died with
+           `InvalidForegroundServiceTypeException: Starting FGS with type
+           unknown ... has been prohibited`. `dataSync` is the type that
+           exists there, so BOTH are declared and the service picks one
+           by SDK level (see `ExportService.foregroundServiceType()`);
+         - each declared type needs its own permission from API 34:
+           `FOREGROUND_SERVICE_DATA_SYNC` and
+           `FOREGROUND_SERVICE_MEDIA_PROCESSING`. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROCESSING" />
+
+    <!-- 2026-09-16 — supportsRtl="true" restored per request: with an
+         ar/fa locale the system may now mirror Rows/Arrangements (RTL
+         layout). NOTE: this reverses the 2026-09-09 LTR decision below —
+         if mirrored layouts break the editor UI, remove this flag again.
+    2026-09-09 LTR FIX (superseded) — supportsRtl was removed ON PURPOSE:
+         the UI stayed LTR and only strings localized. -->
+    <application
+        android:name=".AICreatorStudioApp"
+        android:allowBackup="true"
+        android:supportsRtl="false"
+        android:hardwareAccelerated="true"
+        android:largeHeap="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher"
+        android:theme="@style/Theme.AICreatorStudio"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:fullBackupContent="@xml/backup_rules">
+
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.AICreatorStudio.Launcher">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- 2026-10-22 — the export runs here so it survives the user
+             leaving the app. `mediaProcessing` is the type designed for a
+             video render (API 35+); `dataSync` is the one that exists on
+             API 29-34, which is why both are declared and the service
+             picks by SDK level. Declaring only `mediaProcessing` made the
+             service unstartable on Android 14. -->
+        <service
+            android:name=".export.ExportService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync|mediaProcessing" />
+
+    </application>
+
+</manifest>

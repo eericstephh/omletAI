@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Splash logo. Wraps the bitmap `app_logo` so the system SplashScreen
+  API (and any other place that needs a Drawable, not a Bitmap) can use
+  it. The vector shell lets us add a tint / padding if we ever need to.
+-->
+<bitmap xmlns:android="http://schemas.android.com/apk/res/android"
+    android:src="@drawable/app_logo"
+    android:gravity="center" />

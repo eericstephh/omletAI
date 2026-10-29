@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>مسیر پروژه</title>
+<link href="https://fonts.googleapis.com/css2?family=Vazirmatn:wght@400;600;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0b1220;--panel:#121b2d;--line:#223049;--text:#e7ecf4;--muted:#8695ab;--ok:#4fe3b8;
+--plan:#a78bfa;--code:#34d3b0;--review:#f5b94a;--test:#5cc4f2;--fix:#f0728a}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"Vazirmatn",Tahoma,"Segoe UI",sans-serif;line-height:1.7}
+main{max-width:1100px;margin:0 auto;padding:22px 18px 60px}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:22px}
+h1{margin:0;font-size:1.25rem;font-weight:800}
+.live{display:flex;align-items:center;gap:8px;color:var(--muted);font-size:.85rem}
+.live i{width:9px;height:9px;border-radius:50%;background:var(--muted)}
+.live.on i{background:var(--ok);animation:blink 2s infinite}
+@keyframes blink{50%{opacity:.3}}
+.hero{display:grid;grid-template-columns:auto 1fr;gap:26px;align-items:center;background:var(--panel);border-radius:18px;padding:22px 26px;margin-bottom:22px}
+@media(max-width:640px){.hero{grid-template-columns:1fr;justify-items:center;text-align:center}}
+.ring{position:relative;width:150px;height:150px}
+.ring svg{transform:rotate(90deg) scaleX(-1);width:100%;height:100%}
+.ring circle{fill:none;stroke-width:10;stroke-linecap:round}
+.ring .bg{stroke:var(--line)}
+.ring .fg{stroke:var(--ok);stroke-dasharray:408;stroke-dashoffset:408;transition:stroke-dashoffset 1s cubic-bezier(.2,.8,.2,1)}
+.ring b{position:absolute;inset:0;display:grid;place-items:center;font-size:2.1rem;font-weight:800}
+.ring.full{animation:glow 1.4s ease-out 2}
+@keyframes glow{0%{filter:drop-shadow(0 0 0 rgba(79,227,184,.7))}100%{filter:drop-shadow(0 0 26px rgba(79,227,184,0))}}
+.now small{color:var(--muted)}
+.agent{display:flex;align-items:center;gap:12px;font-size:1.5rem;font-weight:800;margin:2px 0 4px;color:var(--c,var(--text))}
+.spin{width:20px;height:20px;border-radius:50%;border:3px solid currentColor;border-top-color:transparent;animation:rot .9s linear infinite}
+.idle .spin{animation:none;border-top-color:currentColor;opacity:.4}
+@keyframes rot{to{transform:rotate(360deg)}}
+.note{color:var(--muted);margin:0 0 10px;min-height:1.7em}
+.stats{display:flex;gap:26px;flex-wrap:wrap;font-size:.9rem;color:var(--muted)}
+.stats b{color:var(--text);font-size:1.05rem}
+.pipe{list-style:none;display:flex;margin:0 0 26px;padding:0}
+.pipe li{flex:1;text-align:center;position:relative;min-width:0}
+.pipe li::before{content:"";position:absolute;top:17px;right:50%;width:100%;height:3px;background:var(--line);z-index:0}
+.pipe li:first-child::before{display:none}
+.pipe li::after{content:"";position:absolute;top:17px;right:50%;height:3px;width:0;background:var(--ok);transition:width .8s ease;z-index:0}
+.pipe li:first-child::after{display:none}
+.pipe li.done::after,.pipe li.active::after{width:100%}
+.pipe li.active::after{background:linear-gradient(90deg,var(--ok) 0 30%,var(--c) 50%,var(--ok) 70%);background-size:200% 100%;animation:flow 1.6s linear infinite}
+@keyframes flow{to{background-position:-200% 0}}
+.dot{position:relative;z-index:1;width:38px;height:38px;margin:0 auto 8px;border-radius:50%;background:var(--bg);border:3px solid var(--line);display:grid;place-items:center;transition:all .4s}
+.done .dot{background:var(--ok);border-color:var(--ok);color:#06251c}
+.active .dot{border-color:var(--c);color:var(--c);animation:ping 1.8s ease-out infinite}
+@keyframes ping{0%{box-shadow:0 0 0 0 color-mix(in srgb,var(--c) 55%,transparent)}100%{box-shadow:0 0 0 16px transparent}}
+.pipe .n{font-size:.88rem;font-weight:600}.pipe .a{font-size:.75rem;color:var(--muted)}
+.active .n{color:var(--c)}
+.board{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:26px}
+@media(max-width:760px){.board{grid-template-columns:1fr}}
+.col{background:var(--panel);border-radius:14px;padding:14px;min-height:140px}
+.col h2{margin:0 0 12px;font-size:.95rem;font-weight:600;color:var(--muted);display:flex;justify-content:space-between}
+.card{background:var(--bg);border-right:4px solid var(--line);border-radius:10px;padding:9px 12px;margin-bottom:9px;font-size:.92rem}
+.card small{display:block;color:var(--c,var(--muted));font-size:.78rem}
+.card.working{border-color:var(--c)}.card.finished{border-color:var(--ok)}
+.card.working small::before{content:"";display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--c);margin-left:6px;animation:blink 1s infinite}
+.empty{color:var(--muted);font-size:.85rem}
+h3{font-size:.95rem;color:var(--muted);font-weight:600;margin:0 0 10px}
+.log{direction:ltr;text-align:left;font-size:.85rem}
+.ev{display:flex;gap:12px;padding:5px 10px;border-radius:8px;border-left:3px solid var(--c,var(--line));margin-bottom:5px;background:var(--panel);animation:in .5s ease}
+.ev time{color:var(--muted)}
+@keyframes in{from{opacity:0;transform:translateY(-8px)}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+<header><h1 id="name">…</h1><div class="live" id="live"><i></i><span>در حال اتصال</span></div></header>
+
+<section class="hero">
+  <div class="ring" id="ring"><svg viewBox="0 0 150 150"><circle class="bg" cx="75" cy="75" r="65"/><circle class="fg" id="fg" cx="75" cy="75" r="65"/></svg><b id="pct">۰٪</b></div>
+  <div class="now idle" id="now">
+    <small>ایجنت فعال</small>
+    <div class="agent" id="agent"><span class="spin"></span><span id="agentName">آماده</span></div>
+    <p class="note" id="note"></p>
+    <div class="stats">
+      <span>تسک انجام‌شده <b id="sDone">۰</b> از <b id="sAll">۰</b></span>
+      <span>دور رفع خطا <b id="sFix">۰</b></span>
+      <span>زمان کل <b id="sTime">۰:۰۰</b></span>
+    </div>
+  </div>
+</section>
+
+<ol class="pipe" id="pipe"></ol>
+
+<section class="board">
+  <div class="col"><h2>در صف <span id="c0"></span></h2><div id="k0"></div></div>
+  <div class="col"><h2>در جریان <span id="c1"></span></h2><div id="k1"></div></div>
+  <div class="col"><h2>انجام شد <span id="c2"></span></h2><div id="k2"></div></div>
+</section>
+
+<h3>فعالیت ایجنت‌ها</h3>
+<section class="log" id="log"></section>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const fa=n=>String(n).replace(/\d/g,d=>"۰۱۲۳۴۵۶۷۸۹"[d]);
+const calm=matchMedia("(prefers-reduced-motion:reduce)").matches;
+const COLORS={planner:"var(--plan)",coder:"var(--code)",reviewer:"var(--review)",tester:"var(--test)",fixer:"var(--fix)"};
+const FA={planner:"برنامه‌ریز",coder:"کدنویس",reviewer:"بازبین",tester:"تستر",fixer:"رفع‌کننده خطا",orchestrator:"هماهنگ‌کننده"};
+const PHASE={coding:["coder","کدنویسی"],review:["reviewer","بررسی"],testing:["tester","تست"],fixing:["fixer","رفع خطا"]};
+function el(t,c,x){const e=document.createElement(t);if(c)e.className=c;if(x!==undefined)e.textContent=x;return e}
+
+let shownPct=0,raf;
+function countTo(target){cancelAnimationFrame(raf);const from=shownPct,t0=performance.now();
+  const step=t=>{const k=calm?1:Math.min(1,(t-t0)/900),e=1-Math.pow(1-k,3);shownPct=from+(target-from)*e;
+    $("pct").textContent=fa(Math.round(shownPct))+"٪";if(k<1)raf=requestAnimationFrame(step)};raf=requestAnimationFrame(step)}
+
+function renderPipe(p){
+  const pipe=$("pipe");pipe.replaceChildren();
+  (p.stages||[]).forEach(s=>{
+    const act=s.id===p.stage&&s.status!=="done";const li=el("li",act?"active":s.status);
+    li.style.setProperty("--c",COLORS[s.agent]||"var(--ok)");
+    const d=el("div","dot");d.textContent=s.status==="done"?"✓":"";
+    if(act){d.append(el("span","spin"));}
+    li.append(d,el("div","n",s.name),el("div","a",FA[s.agent]||s.agent));pipe.append(li)});
+}
+
+const cards=new Map();
+function renderBoard(tasks){
+  const first=new Map([...cards].map(([id,e])=>[id,e.getBoundingClientRect()]));
+  const cols=[[],[],[]];
+  tasks.forEach(t=>{
+    let e=cards.get(t.id),isNew=!e;
+    if(!e){e=el("div","card");e.append(el("span"),el("small"));cards.set(t.id,e)}
+    const ph=PHASE[t.status];e.firstChild.textContent=t.title;
+    e.className="card "+(t.status==="done"?"finished":ph?"working":"");
+    e.style.setProperty("--c",ph?COLORS[ph[0]]:"var(--muted)");
+    e.lastChild.textContent=t.status==="done"?"انجام شد":ph?ph[1]:"";
+    e._new=isNew;cols[t.status==="done"?2:ph?1:0].push(e)});
+  [...cards].forEach(([id,e])=>{if(!tasks.some(t=>t.id===id)){e.remove();cards.delete(id)}});
+  cols.forEach((list,i)=>{const k=$("k"+i);k.replaceChildren(...list);$("c"+i).textContent=fa(list.length);
+    if(!list.length)k.append(el("div","empty","—"))});
+  if(calm)return;
+  cards.forEach((e,id)=>{
+    if(e._new){e.animate([{opacity:0,transform:"scale(.9)"},{opacity:1,transform:"none"}],{duration:400,easing:"ease-out"});e._new=false;return}
+    const a=first.get(id),b=e.getBoundingClientRect();if(!a)return;
+    const dx=a.left-b.left,dy=a.top-b.top;
+    if(dx||dy)e.animate([{transform:`translate(${dx}px,${dy}px)`},{transform:"none"}],{duration:600,easing:"cubic-bezier(.2,.8,.2,1)"})});
+}
+
+let seen=0;
+function renderLog(ev){
+  const box=$("log"),list=ev.slice().reverse().slice(0,12);
+  const fresh=ev.length-seen;seen=ev.length;box.replaceChildren();
+  list.forEach((e,i)=>{const ag=(e.msg||"").split(":")[0].trim();const d=el("div","ev");
+    d.style.setProperty("--c",COLORS[ag]||"var(--line)");
+    if(i>=fresh||fresh<=0)d.style.animation="none";
+    d.append(el("time",null,(e.t||"").slice(11,19)),el("span",null,e.type+" · "+e.msg));box.append(d)});
+}
+
+function render(data){
+  const p=data.progress||{},ev=data.events||[],tasks=p.tasks||[];
+  $("name").textContent=p.project||"پروژه";$("note").textContent=p.note||"";
+  const done=tasks.filter(t=>t.status==="done").length,pct=tasks.length?Math.round(done/tasks.length*100):0;
+  $("fg").style.strokeDashoffset=408*(1-pct/100);countTo(pct);$("ring").classList.toggle("full",pct===100);
+  $("sDone").textContent=fa(done);$("sAll").textContent=fa(tasks.length);
+  $("sFix").textContent=fa(ev.filter(e=>e.type==="start"&&/^fixer/.test(e.msg)).length);
+  const last=[...ev].reverse().find(e=>e.type==="start"),lastDone=[...ev].reverse().find(e=>e.type==="done");
+  const working=last&&(!lastDone||lastDone.t<last.t);
+  const ag=working?last.msg.split(":")[0].trim():null;
+  $("now").classList.toggle("idle",!working);
+  $("agent").style.setProperty("--c",COLORS[ag]||"var(--text)");
+  $("agentName").textContent=working?(FA[ag]||ag):(pct===100&&tasks.length?"پروژه کامل شد":"در انتظار");
+  window._t0=ev.length?new Date(ev[0].t).getTime():null;
+  renderPipe(p);renderBoard(tasks);renderLog(ev);
+}
+setInterval(()=>{if(!window._t0)return;const s=Math.floor((Date.now()-window._t0)/1000);
+  $("sTime").textContent=fa(Math.floor(s/60))+":"+fa(String(s%60).padStart(2,"0"))},1000);
+
+function connect(){
+  const es=new EventSource("/api/stream"),live=$("live");
+  es.onopen=()=>{live.className="live on";live.lastChild.textContent="زنده"};
+  es.onmessage=m=>render(JSON.parse(m.data));
+  es.onerror=()=>{live.className="live";live.lastChild.textContent="قطع شد؛ در حال اتصال مجدد"}
+}
+connect();
+</script>
+</body>
+</html>

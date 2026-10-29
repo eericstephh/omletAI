@@ -1,0 +1,11 @@
+1
+00:00:00,000 --> 00:00:05,000
+Long first cue
+
+2
+00:00:02,000 --> 00:00:04,000
+Shorter cue inside
+
+3
+00:00:03,500 --> 00:00:06,000
+Another overlapping cue

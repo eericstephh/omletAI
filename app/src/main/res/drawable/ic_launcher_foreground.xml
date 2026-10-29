@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  2026-09-06: the adaptive-icon foreground is now the brand image
+  (drawable/app_logo.png). A layer-list + bitmap wrapper insets the
+  artwork into the 108dp adaptive layer so the circular / squircle
+  masks crop padding, not the logo itself.
+-->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:top="18dp"
+        android:bottom="18dp"
+        android:left="18dp"
+        android:right="18dp">
+        <bitmap
+            android:src="@drawable/app_logo"
+            android:gravity="center" />
+    </item>
+</layer-list>

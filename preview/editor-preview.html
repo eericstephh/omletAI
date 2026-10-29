@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AI Creator Studio — iOS-Style Editor Preview</title>
+<style>
+:root {
+    --ios-black: #000000;
+    --ios-bg: #0D0D0E;
+    --ios-surface: #1C1C1E;
+    --ios-surface-high: #2C2C2E;
+    --ios-surface-highest: #3A3A3C;
+    --ios-blue: #0A84FF;
+    --ios-blue-bright: #409CFF;
+    --ios-cyan: #64D2FF;
+    --ios-green: #30D158;
+    --ios-red: #FF453A;
+    --ios-orange: #FF9F0A;
+    --ios-pink: #FF375F;
+    --ios-purple: #BF5AF2;
+    --ios-indigo: #5E5CE6;
+    --label-primary: #FFFFFF;
+    --label-secondary: rgba(235, 235, 245, 0.75);
+    --label-tertiary: rgba(235, 235, 245, 0.50);
+    --hairline: rgba(255, 255, 255, 0.20);
+    --hairline-subtle: rgba(255, 255, 255, 0.10);
+    --glass-thin: rgba(255, 255, 255, 0.08);
+    --glass-regular: rgba(255, 255, 255, 0.12);
+    --glass-thick: rgba(255, 255, 255, 0.16);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+    background: linear-gradient(180deg, #0A0A0B 0%, #0D0D0E 50%, #101012 100%);
+    color: var(--label-primary);
+    min-height: 100vh;
+    padding: 24px;
+    letter-spacing: -0.01em;
+}
+.phone-frame {
+    max-width: 414px;
+    margin: 0 auto;
+    background: var(--ios-bg);
+    border-radius: 48px;
+    border: 8px solid #1a1a1c;
+    overflow: hidden;
+    box-shadow: 0 30px 80px rgba(0, 0, 0, 0.6);
+}
+.status-bar {
+    height: 44px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 24px;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--label-primary);
+}
+.editor-container {
+    padding: 0 8px 8px;
+}
+
+/* === Floating top bar (glass) === */
+.top-bar {
+    margin: 0 4px 8px;
+    background: var(--glass-regular);
+    border: 1px solid var(--hairline-subtle);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 22px;
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+.icon-btn {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--hairline-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: white;
+    font-size: 18px;
+}
+.title-block { flex: 1; }
+.eyebrow {
+    color: var(--ios-blue-bright);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+.title-large {
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--label-primary);
+}
+.export-pill {
+    background: linear-gradient(90deg, var(--ios-blue), var(--ios-blue-bright));
+    border: 1px solid rgba(64, 156, 255, 0.5);
+    border-radius: 50px;
+    padding: 8px 14px;
+    color: white;
+    font-size: 13px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+/* === Video preview === */
+.video-preview {
+    margin: 0 12px 8px;
+    background: #000;
+    border-radius: 20px;
+    aspect-ratio: 16 / 9;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--hairline-subtle);
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.video-preview::before {
+    content: "▶";
+    font-size: 64px;
+    color: rgba(255, 255, 255, 0.3);
+}
+
+/* === Floating playback controls (glass) === */
+.playback-controls {
+    margin: 0 4px 8px;
+    background: var(--glass-regular);
+    border: 1px solid var(--hairline-subtle);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 22px;
+    padding: 14px 18px;
+}
+.scrubber-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+.time-label {
+    color: var(--label-secondary);
+    font-size: 12px;
+    font-weight: 500;
+    min-width: 42px;
+    text-align: center;
+}
+.slider-track {
+    flex: 1;
+    height: 4px;
+    background: var(--hairline);
+    border-radius: 2px;
+    position: relative;
+}
+.slider-fill {
+    position: absolute;
+    top: 0; left: 0;
+    height: 100%;
+    width: 35%;
+    background: linear-gradient(90deg, var(--ios-blue), var(--ios-blue-bright));
+    border-radius: 2px;
+}
+.slider-thumb {
+    position: absolute;
+    top: 50%;
+    left: 35%;
+    transform: translate(-50%, -50%);
+    width: 26px;
+    height: 26px;
+    background: radial-gradient(circle at 30% 30%, #ffffff, #e0e0e5);
+    border-radius: 50%;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 0 20px rgba(64, 156, 255, 0.3);
+}
+.transport-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.play-pause {
+    margin: 0 auto;
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: radial-gradient(circle at 30% 30%, #ffffff, #e0e0e5);
+    border: 1px solid var(--hairline);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: black;
+    font-size: 24px;
+    box-shadow: 0 0 24px rgba(64, 156, 255, 0.4);
+    cursor: pointer;
+}
+.mute-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--hairline-subtle);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 14px;
+    cursor: pointer;
+}
+.mini-slider {
+    width: 110px;
+    height: 4px;
+    background: var(--hairline);
+    border-radius: 2px;
+    position: relative;
+    margin-left: 8px;
+}
+.mini-slider-fill {
+    position: absolute;
+    top: 0; left: 0;
+    height: 100%;
+    width: 60%;
+    background: var(--ios-blue);
+    border-radius: 2px;
+}
+.mini-slider-thumb {
+    position: absolute;
+    top: 50%;
+    left: 60%;
+    transform: translate(-50%, -50%);
+    width: 16px;
+    height: 16px;
+    background: white;
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(64, 156, 255, 0.5);
+}
+
+/* === Floating timeline === */
+.timeline {
+    margin: 0 4px 8px;
+    background: var(--glass-regular);
+    border: 1px solid var(--hairline-subtle);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 22px;
+    padding: 10px 12px;
+}
+.timeline-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+}
+.timeline-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--label-primary);
+}
+.zoom-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--hairline-subtle);
+    color: rgba(255, 255, 255, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 14px;
+}
+.ruler {
+    display: flex;
+    height: 20px;
+    position: relative;
+    margin: 4px 0;
+    border-bottom: 1px solid var(--hairline-subtle);
+}
+.ruler-tick {
+    position: absolute;
+    top: 0;
+    width: 1px;
+    height: 12px;
+    background: var(--label-tertiary);
+}
+.ruler-tick.major { height: 16px; }
+.ruler-label {
+    position: absolute;
+    top: 14px;
+    left: 2px;
+    font-size: 9px;
+    color: var(--label-secondary);
+    font-weight: 500;
+}
+.ruler-playhead {
+    position: absolute;
+    top: -2px;
+    left: 35%;
+    width: 12px;
+    height: 12px;
+    background: radial-gradient(circle, white, var(--ios-blue-bright));
+    border: 1px solid var(--ios-blue);
+    border-radius: 50%;
+    cursor: grab;
+}
+.tracks {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: relative;
+}
+.track-row {
+    display: flex;
+    height: 36px;
+    align-items: center;
+    position: relative;
+}
+.track-label {
+    width: 56px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 10px;
+    color: var(--label-secondary);
+    font-weight: 500;
+    padding-right: 8px;
+}
+.track-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+}
+.track-lane {
+    flex: 1;
+    height: 36px;
+    background: rgba(255, 255, 255, 0.04);
+    border-radius: 8px;
+    position: relative;
+}
+.clip {
+    position: absolute;
+    top: 0;
+    height: 36px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 10px;
+    font-weight: 500;
+    overflow: hidden;
+}
+.clip-video {
+    background: linear-gradient(180deg, rgba(94, 92, 230, 0.95), rgba(94, 92, 230, 0.75));
+    box-shadow: 0 0 0 1.5px var(--ios-blue-bright), 0 0 20px rgba(10, 132, 255, 0.4);
+    width: 60%;
+    left: 2%;
+}
+.clip-video-2 {
+    background: linear-gradient(180deg, rgba(94, 92, 230, 0.75), rgba(94, 92, 230, 0.55));
+    width: 35%;
+    left: 64%;
+}
+.clip-music {
+    background: linear-gradient(180deg, rgba(255, 159, 10, 0.75), rgba(255, 159, 10, 0.55));
+    width: 50%;
+    left: 10%;
+}
+.clip-overlay {
+    background: linear-gradient(180deg, rgba(48, 209, 88, 0.75), rgba(48, 209, 88, 0.55));
+    width: 25%;
+    left: 25%;
+}
+.clip-subtitle {
+    background: linear-gradient(180deg, rgba(191, 90, 242, 0.80), rgba(191, 90, 242, 0.55));
+    width: 40%;
+    left: 30%;
+}
+.playhead-line {
+    position: absolute;
+    top: 0;
+    left: 35%;
+    width: 2px;
+    height: 100%;
+    background: linear-gradient(180deg, var(--ios-blue-bright), var(--ios-blue));
+    z-index: 10;
+}
+
+/* === Floating bottom toolbar (glass) === */
+.bottom-toolbar {
+    position: sticky;
+    bottom: 0;
+    margin: 8px 4px 12px;
+    background: var(--glass-regular);
+    border: 1px solid var(--hairline-subtle);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-radius: 28px;
+    padding: 6px 8px;
+    overflow-x: auto;
+    white-space: nowrap;
+}
+.toolbar-items {
+    display: flex;
+    gap: 2px;
+    align-items: center;
+}
+.toolbar-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    width: 56px;
+    padding: 4px 2px;
+    border-radius: 16px;
+    cursor: pointer;
+}
+.toolbar-icon-box {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    color: var(--label-primary);
+}
+.toolbar-item.active .toolbar-icon-box {
+    background: rgba(10, 132, 255, 0.22);
+    box-shadow: 0 0 16px rgba(10, 132, 255, 0.4);
+    color: var(--ios-blue-bright);
+}
+.toolbar-item.destructive .toolbar-icon-box {
+    color: var(--ios-red);
+}
+.toolbar-label {
+    font-size: 9px;
+    color: var(--label-secondary);
+    margin-top: 3px;
+    font-weight: 500;
+}
+.toolbar-item.active .toolbar-label {
+    color: var(--label-primary);
+    font-weight: 600;
+}
+.toolbar-item.destructive .toolbar-label {
+    color: var(--ios-red);
+}
+
+.section {
+    margin: 32px auto;
+    max-width: 414px;
+    color: white;
+    text-align: center;
+}
+.section h2 {
+    color: var(--ios-blue-bright);
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 6px;
+}
+.section p {
+    color: var(--label-secondary);
+    font-size: 16px;
+    font-weight: 500;
+}
+
+.color-swatch {
+    width: 100%;
+    height: 32px;
+    border-radius: 6px;
+    border: 1px solid var(--hairline);
+}
+.palette {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 8px;
+    max-width: 414px;
+    margin: 0 auto;
+}
+.palette-item {
+    text-align: center;
+}
+.palette-label {
+    font-size: 9px;
+    color: var(--label-tertiary);
+    margin-top: 4px;
+    font-family: monospace;
+}
+</style>
+</head>
+<body>
+<div class="section">
+    <h2>AI Creator Studio</h2>
+    <p>iOS-Style Premium Editor — Visual Preview</p>
+</div>
+
+<div class="phone-frame">
+    <div class="status-bar">
+        <span>9:41</span>
+        <span>5G ●●●●● 100%</span>
+    </div>
+    <div class="editor-container">
+
+        <!-- Floating top bar -->
+        <div class="top-bar">
+            <div class="icon-btn">‹</div>
+            <div class="title-block">
+                <div class="eyebrow">Editing</div>
+                <div class="title-large">My Summer Vlog</div>
+            </div>
+            <div class="export-pill">↑ Export</div>
+        </div>
+
+        <!-- Video preview -->
+        <div class="video-preview"></div>
+
+        <!-- Floating playback controls -->
+        <div class="playback-controls">
+            <div class="scrubber-row">
+                <span class="time-label">00:18</span>
+                <div class="slider-track">
+                    <div class="slider-fill"></div>
+                    <div class="slider-thumb"></div>
+                </div>
+                <span class="time-label">01:30</span>
+            </div>
+            <div class="transport-row">
+                <div></div>
+                <div class="play-pause">▶</div>
+                <div style="display: flex; align-items: center;">
+                    <div class="mute-btn">🔊</div>
+                    <div class="mini-slider">
+                        <div class="mini-slider-fill"></div>
+                        <div class="mini-slider-thumb"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Timeline -->
+        <div class="timeline">
+            <div class="timeline-header">
+                <span class="timeline-title">Timeline</span>
+                <div style="display: flex; gap: 6px;">
+                    <div class="zoom-btn">−</div>
+                    <div class="zoom-btn">+</div>
+                </div>
+            </div>
+            <div class="ruler">
+                <div class="ruler-tick" style="left: 0%"></div>
+                <div class="ruler-tick major" style="left: 16%"></div>
+                <div class="ruler-tick" style="left: 32%"></div>
+                <div class="ruler-tick major" style="left: 48%"></div>
+                <div class="ruler-tick" style="left: 64%"></div>
+                <div class="ruler-tick major" style="left: 80%"></div>
+                <div class="ruler-tick" style="left: 96%"></div>
+                <span class="ruler-label" style="left: 0%">0:00</span>
+                <span class="ruler-label" style="left: 16%">0:15</span>
+                <span class="ruler-label" style="left: 32%">0:30</span>
+                <span class="ruler-label" style="left: 48%">0:45</span>
+                <span class="ruler-label" style="left: 64%">1:00</span>
+                <span class="ruler-label" style="left: 80%">1:15</span>
+                <div class="ruler-playhead"></div>
+            </div>
+            <div class="tracks">
+                <div class="track-row">
+                    <div class="track-label">
+                        <div class="track-dot" style="background: #5E5CE6;"></div>
+                        Video
+                    </div>
+                    <div class="track-lane">
+                        <div class="clip clip-video">summer.mp4</div>
+                        <div class="clip clip-video-2">vlog2.mp4</div>
+                    </div>
+                </div>
+                <div class="track-row">
+                    <div class="track-label">
+                        <div class="track-dot" style="background: #FF9F0A;"></div>
+                        Music
+                    </div>
+                    <div class="track-lane">
+                        <div class="clip clip-music">♪ beat.mp3</div>
+                    </div>
+                </div>
+                <div class="track-row">
+                    <div class="track-label">
+                        <div class="track-dot" style="background: #30D158;"></div>
+                        Overlay
+                    </div>
+                    <div class="track-lane">
+                        <div class="clip clip-overlay">logo.png</div>
+                    </div>
+                </div>
+                <div class="track-row">
+                    <div class="track-label">
+                        <div class="track-dot" style="background: #BF5AF2;"></div>
+                        Subs
+                    </div>
+                    <div class="track-lane">
+                        <div class="clip clip-subtitle">Hello world</div>
+                    </div>
+                </div>
+                <div class="playhead-line"></div>
+            </div>
+        </div>
+
+        <!-- Floating bottom toolbar -->
+        <div class="bottom-toolbar">
+            <div class="toolbar-items">
+                <div class="toolbar-item">
+                    <div class="toolbar-icon-box">⫶</div>
+                    <span class="toolbar-label">Split</span>
+                </div>
+                <div class="toolbar-item">
+                    <div class="toolbar-icon-box">↻</div>
+                    <span class="toolbar-label">Rotate</span>
+                </div>
+                <div class="toolbar-item destructive">
+                    <div class="toolbar-icon-box">🗑</div>
+                    <span class="toolbar-label">Delete</span>
+                </div>
+                <div class="toolbar-item">
+                    <div class="toolbar-icon-box">⎘</div>
+                    <span class="toolbar-label">Duplicate</span>
+                </div>
+                <div class="toolbar-item">
+                    <div class="toolbar-icon-box">✂</div>
+                    <span class="toolbar-label">Trim</span>
+                </div>
+                <div class="toolbar-item">
+                    <div class="toolbar-icon-box">⏱</div>
+                    <span class="toolbar-label">Speed</span>
+                </div>
+                <div class="toolbar-item active">
+                    <div class="toolbar-icon-box">🎬</div>
+                    <span class="toolbar-label">Filter</span>
+                </div>
+                <div class="toolbar-item">
+                    <div class="toolbar-icon-box">🔊</div>
+                    <span class="toolbar-label">Volume</span>
+                </div>
+                <div class="toolbar-item">
+                    <div class="toolbar-icon-box">⛶</div>
+                    <span class="toolbar-label">Crop</span>
+                </div>
+                <div class="toolbar-item">
+                    <div class="toolbar-icon-box">✨</div>
+                    <span class="toolbar-label">Animate</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="section">
+    <h2>Color Palette</h2>
+    <p>Deep dark surfaces with iOS system accent colors</p>
+</div>
+
+<div class="palette">
+    <div class="palette-item">
+        <div class="color-swatch" style="background: #0D0D0E;"></div>
+        <div class="palette-label">#0D0D0E<br>Background</div>
+    </div>
+    <div class="palette-item">
+        <div class="color-swatch" style="background: #1C1C1E;"></div>
+        <div class="palette-label">#1C1C1E<br>Surface</div>
+    </div>
+    <div class="palette-item">
+        <div class="color-swatch" style="background: #2C2C2E;"></div>
+        <div class="palette-label">#2C2C2E<br>Surface High</div>
+    </div>
+    <div class="palette-item">
+        <div class="color-swatch" style="background: #3A3A3C;"></div>
+        <div class="palette-label">#3A3A3C<br>Surface Max</div>
+    </div>
+    <div class="palette-item">
+        <div class="color-swatch" style="background: #0A84FF;"></div>
+        <div class="palette-label">#0A84FF<br>iOS Blue</div>
+    </div>
+    <div class="palette-item">
+        <div class="color-swatch" style="background: #409CFF;"></div>
+        <div class="palette-label">#409CFF<br>Blue Bright</div>
+    </div>
+    <div class="palette-item">
+        <div class="color-swatch" style="background: #5E5CE6;"></div>
+        <div class="palette-label">#5E5CE6<br>Indigo</div>
+    </div>
+    <div class="palette-item">
+        <div class="color-swatch" style="background: #64D2FF;"></div>
+        <div class="palette-label">#64D2FF<br>Cyan</div>
+    </div>
+    <div class="palette-item">
+        <div class="color-swatch" style="background: #30D158;"></div>
+        <div class="palette-label">#30D158<br>Green</div>
+    </div>
+    <div class="palette-item">
+        <div class="color-swatch" style="background: #FF453A;"></div>
+        <div class="palette-label">#FF453A<br>Red</div>
+    </div>
+    <div class="palette-item">
+        <div class="color-swatch" style="background: #FF9F0A;"></div>
+        <div class="palette-label">#FF9F0A<br>Orange</div>
+    </div>
+    <div class="palette-item">
+        <div class="color-swatch" style="background: #BF5AF2;"></div>
+        <div class="palette-label">#BF5AF2<br>Purple</div>
+    </div>
+</div>
+
+<div style="height: 60px;"></div>
+</body>
+</html>

@@ -1,0 +1,78 @@
+{
+  "_format": "aicreatorstudio-ai-manifest-v1",
+  "_generatedAt": "2026-10-27T19:01:24.695255Z",
+  "models": [
+    {
+      "id": "whisper-small",
+      "displayName": "Whisper Small (سریع)",
+      "dirName": "whisper-ggml-small",
+      "fileName": "ggml-small.bin",
+      "sizeBytes": 487601967,
+      "sha256": "1be3a9b2063867b937e64e2ec7483364a79917e157fa98c5d94b5c1fffea987b",
+      "bundledOnly": false
+    },
+    {
+      "id": "selfie_multiclass",
+      "displayName": "MediaPipe Selfie Multiclass (256x256)",
+      "dirName": "selfie_multiclass",
+      "fileName": "selfie_multiclass_256x256.tflite",
+      "sizeBytes": 16371837,
+      "sha256": "c6748b1253a99067ef71f7e26ca71096cd449baefa8f101900ea23016507e0e0",
+      "bundledOnly": false
+    },
+    {
+      "id": "pose_landmarker_lite",
+      "displayName": "MediaPipe Pose Landmarker (Lite)",
+      "dirName": "pose_landmarker_lite",
+      "fileName": "pose_landmarker_lite.task",
+      "sizeBytes": 5777746,
+      "sha256": "59929e1d1ee95287735ddd833b19cf4ac46d29bc7afddbbf6753c459690d574a",
+      "bundledOnly": false
+    },
+    {
+      "id": "esrgan_tflite_4x",
+      "displayName": "ESRGAN TFLite (4x)",
+      "dirName": "esrgan_tflite",
+      "fileName": "ESRGAN.tflite",
+      "sizeBytes": 4993712,
+      "sha256": "1a380d3744103e11ef343534aaff54815cae40769dcd00c023652a7e5bc47f4b",
+      "bundledOnly": false
+    },
+    {
+      "id": "blaze_face_short_range",
+      "displayName": "MediaPipe Blaze Face (Short Range)",
+      "dirName": "face_detector",
+      "fileName": "blaze_face_short_range.tflite",
+      "sizeBytes": 229746,
+      "sha256": "b4578f35940bf5a1a655214a1cce5cab13eba73c1297cd78e1a04c2380b0152f",
+      "bundledOnly": false
+    },
+    {
+      "id": "tesseract_fas",
+      "displayName": "Tesseract OCR — Persian (fas)",
+      "dirName": "tesseract/tessdata",
+      "fileName": "fas.traineddata",
+      "sizeBytes": 431500,
+      "sha256": "db1c0a91208aff00d3cf1ed2c1d23f76419afd5f024688b4f71adc3f2ce4a505",
+      "bundledOnly": false
+    },
+    {
+      "id": "tesseract_ara",
+      "displayName": "Tesseract OCR — Arabic (ara)",
+      "dirName": "tesseract/tessdata",
+      "fileName": "ara.traineddata",
+      "sizeBytes": 1432056,
+      "sha256": "e3206d3dc87fd50c24a0fb9f01838615911d25168f4e64415244b67d2bb3e729",
+      "bundledOnly": false
+    },
+    {
+      "id": "tesseract_eng",
+      "displayName": "Tesseract OCR — English (eng)",
+      "dirName": "tesseract/tessdata",
+      "fileName": "eng.traineddata",
+      "sizeBytes": 4113088,
+      "sha256": "7d4322bd2a7749724879683fc3912cb542f19906c83bcc1a52132556427170b2",
+      "bundledOnly": false
+    }
+  ]
+}

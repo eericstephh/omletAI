@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">املتAI</string>
+    <string name="home_title">استوديو الإبداع بالذكاء الاصطناعي</string>
+    <string name="home_subtitle">أساس تحرير الفيديو الخاص بك جاهز.</string>
+    <string name="settings_language_title">لغة التطبيق</string>
+    <string name="settings_language_summary">اختر لغة الواجهة (الافتراضي: الفارسية)</string>
+</resources>

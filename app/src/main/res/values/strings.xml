@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">املتAI</string>
+    <string name="home_title">AI Creator Studio</string>
+    <string name="home_subtitle">Your video editing foundation is ready.</string>
+    <string name="settings_language_title">App language</string>
+    <string name="settings_language_summary">Choose the interface language (default: Persian)</string>
+</resources>

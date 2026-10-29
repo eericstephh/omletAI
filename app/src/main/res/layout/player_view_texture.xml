@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  2026-09-01 matting preview support.
+
+  A minimal layout wrapper that constructs a PlayerView with
+  surface_type="texture_view" instead of the default SurfaceView.
+  The foreground preview in the editor is inflated from this layout
+  so the Compose graphics layer above can composite a per-pixel
+  alpha mask against the player surface (the default SurfaceView
+  renders in its own compositor layer and is NOT captured by
+  drawContent / saveLayer, which blocks the matting composite path).
+
+  This file is only inflated programmatically via
+  `LayoutInflater.from(ctx).inflate(R.layout.player_view_texture,
+  parent, false)` inside `EditorVideoPreviewSection`. There is no
+  real layout children — the PlayerView itself fills the
+  AndroidView container.
+-->
+<androidx.media3.ui.PlayerView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@android:color/transparent"
+    app:surface_type="texture_view"
+    app:use_controller="false" />

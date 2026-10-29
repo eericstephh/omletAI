@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  2026-09-14 FONT SYSTEM — weight-aware font families for the
+  Persian subtitle engine. Each family bundles its real TTF
+  weights; Android's FontFamily resolver picks the closest
+  weight for FontWeight.Bold/Black/Medium selections.
+  All fonts are SIL OFL (rastikerdar / aminabedi68 releases).
+-->
+<font-family xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <font app:fontStyle="normal" app:fontWeight="200" app:font="@font/vazirmatn_light" />
+    <font app:fontStyle="normal" app:fontWeight="400" app:font="@font/vazirmatn" />
+    <font app:fontStyle="normal" app:fontWeight="500" app:font="@font/vazirmatn_medium" />
+    <font app:fontStyle="normal" app:fontWeight="700" app:font="@font/vazirmatn_bold" />
+    <font app:fontStyle="normal" app:fontWeight="900" app:font="@font/vazirmatn_black" />
+</font-family>

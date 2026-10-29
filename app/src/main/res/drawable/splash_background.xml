@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Solid background for the system splash screen (the brief one shown
+  before Compose is up). Matches the in-app splash background so the
+  transition between system splash and Compose splash is seamless.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#090A0F" />
+</shape>

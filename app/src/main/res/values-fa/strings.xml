@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">املتAI</string>
+    <string name="home_title">استودیو خلق با هوش مصنوعی</string>
+    <string name="home_subtitle">زیرساخت ویرایش ویدیوی شما آماده است.</string>
+    <string name="settings_language_title">زبان اپلیکیشن</string>
+    <string name="settings_language_summary">زبان رابط کاربری را انتخاب کنید (پیش‌فرض: فارسی)</string>
+</resources>

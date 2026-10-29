@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  PHASE 5 — DEBUG-ONLY manifest.
+
+  The `debug` source set is merged into the debug variant only, so the
+  activity below cannot reach a release APK. This is structural, not a
+  runtime flag: there is no `BuildConfig.DEBUG` guard to forget and no
+  menu entry to remove before shipping.
+
+  `exported="true"` is required so `adb shell am start` can launch it —
+  the shell UID cannot start a non-exported activity belonging to
+  another package. That is acceptable precisely because the component
+  does not exist in release builds.
+
+  There is deliberately NO launcher intent-filter, so the showcase never
+  appears as a second app icon on the device.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <application>
+        <activity
+            android:name="com.aicreatorstudio.app.debugtools.SubtitleShowcaseActivity"
+            android:exported="true"
+            android:label="Omelet Subtitle Showcase (debug only)"
+            android:theme="@style/Theme.AICreatorStudio" />
+    </application>
+
+</manifest>

@@ -1,0 +1,59 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+
+# Node (OpenCode may create these when plugins are used locally)
+node_modules/
+.opencode/node_modules/
+.opencode/package-lock.json
+.opencode/bun.lock*
+
+# Local secrets and environment (never commit)
+.env
+.env.*
+*.pem
+*.key
+*.jks
+*.keystore
+
+# ⚠️ Signing credentials + sdk.dir. Never commit this file.
+local.properties
+
+# Gradle / Android build output
+build/
+app/build/
+.gradle/
+# CMake / NDK intermediates (84 MB of .o files)
+app/.cxx/
+captures/
+*.hprof
+
+# Release artifacts
+dist/
+*.zip
+*.apk
+*.aab
+
+# Stray compile output accidentally left at the repo root (497 .class files)
+/com/
+
+# Local screenshots and scratch logs
+.claude-shots/
+gradle_output.txt
+*.log
+
+# AI model weights — downloaded, not source. `models.lock.json` is the contract.
+app/ai-models/**/*.bin
+app/ai-models/**/*.onnx
+app/ai-models/**/*.tflite
+app/ai-models/**/*.task
+app/ai-models/**/*.gguf

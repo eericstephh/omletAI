@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.AICreatorStudio" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+
+    <!--
+      Launcher splash theme. Applied to MainActivity via the manifest's
+      `android:theme` and replaced with the regular in-app theme in
+      `MainActivity.onCreate` once `installSplashScreen()` is called. The
+      system splashscreen API reads these attributes to draw the brief
+      splash that shows before Compose is ready, so we use the same
+      background colour and the existing app logo as the centered icon.
+    -->
+    <style name="Theme.AICreatorStudio.Launcher" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/splash_background</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_splash_logo</item>
+        <item name="postSplashScreenTheme">@style/Theme.AICreatorStudio</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+    </style>
+</resources>

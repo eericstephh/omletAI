@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./gradlew compileDebugKotlin)",
+      "Bash(java -version)",
+      "Read(//c/Program Files/**)",
+      "Read(//c/Android/**)",
+      "Bash(xargs grep -l \"AppDestinations\\\\|NavGraph\")",
+      "WebSearch",
+      "WebFetch(domain:composables.com)",
+      "Bash(awk { for\\(i=1;i<=length\\($0\\);i++\\) { c=substr\\($0,i,1\\); if\\(c==\"{\"\\)o++; if\\(c==\"}\"\\)cl++ } } END{print \"open=\"o, \"close=\"cl, \"diff=\"o-cl} *)",
+      "Bash(awk *)",
+      "Bash(head *)",
+      "Bash(grep *)",
+      "Bash(./gradlew :app:compileDebugKotlin --no-daemon -q)",
+      "Bash(./gradlew :app:compileDebugKotlin)",
+      "Bash(where java *)",
+      "Bash(./gradlew.bat :app:compileDebugKotlin --no-daemon)",
+      "WebFetch(domain:github.com)",
+      "Bash(unzip *)",
+      "Bash(javap -public media3-exoplayer-1.5.0-api.jar)",
+      "Bash(javap -public /tmp/m3/androidx/media3/exoplayer/SimpleExoPlayer.class)",
+      "Bash(not exist *)",
+      "Bash(./gradlew :app:compileDebugKotlin --offline -q)",
+      "Bash(where javac *)",
+      "Bash(command -v java javac)",
+      "Bash(cmd //c \"gradlew.bat :app:compileDebugKotlin --no-daemon 2>&1\")",
+      "Bash(cmd //c \".\\\\\\\\gradlew.bat :app:compileDebugKotlin --no-daemon 2>&1\")",
+      "Read(//c/Program Files \\\\\\(x86\\\\\\)/**)",
+      "Read(//c//**)",
+      "WebFetch(domain:huggingface.co)",
+      "Bash(cd *)",
+      "Bash(./gradlew assembleDebug)"
+    ]
+  }
+}

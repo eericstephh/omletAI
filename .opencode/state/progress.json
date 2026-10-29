@@ -1,0 +1,14 @@
+{
+  "project": "نام پروژه",
+  "stage": "plan",
+  "note": "هنوز شروع نشده",
+  "stages": [
+    {"id":"plan","name":"برنامه‌ریزی","agent":"planner","status":"pending"},
+    {"id":"coding","name":"کدنویسی","agent":"coder","status":"pending"},
+    {"id":"review","name":"بررسی کد","agent":"reviewer","status":"pending"},
+    {"id":"testing","name":"تست و بیلد","agent":"tester","status":"pending"},
+    {"id":"fixing","name":"رفع خطا","agent":"fixer","status":"pending"},
+    {"id":"final","name":"بررسی نهایی","agent":"reviewer","status":"pending"}
+  ],
+  "tasks": []
+}
