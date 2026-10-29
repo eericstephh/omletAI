@@ -9,6 +9,10 @@ Media3 → `media3-export-parity` skill; Atlas/pipeline maps → `aierix-cut-pro
 
 ## Build & test
 
+**Git exists since 2026-10-29** (`96f0f73` baseline). Use `git diff` before claiming what changed — the
+repo had none before, so anything older has no history. `local.properties` (signing passwords) and
+`app/ai-models/**/*.bin` are ignored; do not "fix" that.
+
 `./gradlew <task> --offline` from Bash; keep `--offline`. `cmd.exe` is blocked from the PowerShell tool.
 Full procedure — JDK-21 fallback command, stale-test parking, APK verification, release signing, adb gotchas —
 → **`reference/build-and-apk.md`**.
@@ -117,6 +121,16 @@ Also there: `SequentialFrameSampler` is mandatory for frame analysis (never `OPT
 seven Whisper defects behind the Persian accuracy work (`logprob_thold = -1.0` because the temperature ladder's
 last rung is accepted unconditionally; natural-text primer; AA resampling; conditioning; window planning;
 cross-window carry).
+
+## Matting mask (2026-10-29)
+
+- **The category mask is binary** — `cls == 0 → 0f else 1f`. There is no soft knee and never was. Partial
+  alpha came only from the old EMA; soft edges are the composition-time feather (`MaskPostProcess`).
+- **`ai/MattingTemporalFilter.kt`** = median of three + scene-cut reset at 0.35. **Do not add an EMA on
+  top** — it turns the median's one-frame lag into a multi-frame fade; `MattingTemporalFilterTest` catches it.
+- **`ANALYSIS_MAX_SIDE = 512`, not 320.** 320 gives a 16:9 short side of 180, *below* the model's 256
+  input → the segmenter upscales. The test `analysis bound keeps the short side at the model input` pins it.
+
 
 ## Sub-panel sizing (2026-10-01)
 
