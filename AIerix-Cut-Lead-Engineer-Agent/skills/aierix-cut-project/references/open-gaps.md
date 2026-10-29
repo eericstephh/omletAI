@@ -173,9 +173,35 @@ without new weights:
   side and was rejected for that reason. Halves the per-frame pixel count
   (147k vs 291k). Pinned by `AiMattingEngineTest`.
 
-**Both are unverified on a device** — none was attached on 2026-10-29. The
-compile is green and 20 JVM tests pass; the visual result (ghost removal, cut
-handling, edge fidelity at 512) still needs a real clip.
+**Both are unverified on a device** — none was attached when they were written. The compile is
+green and 28 JVM tests pass; the visual result (ghost removal, cut handling, edge fidelity at 512)
+still needs a real clip.
+
+### The device session found a real export crash (fixed, re-verification pending)
+
+The phone was attached later on 2026-10-29 and Background Remove ran end to end: 358 frames, no
+crash, the summary line logged. **The export then died at PREPARING** with the useless user-facing
+message "Video processing failed". The log stack was fully obfuscated; resolving it through
+`app/build/outputs/mapping/release/mapping.txt` (written by every release build) gave
+`AiExportHooks$compositeMatting$2` → `Bitmap.setPixels` →
+
+> `MaskBitmaps.applyPostProcess` wrote the processed alpha **back into the bitmap it was handed**,
+> and its only caller passes `BitmapFactory.decodeFile(sidecarPng)`. Decoded bitmaps are
+> **immutable**, so `setPixels` threw `IllegalStateException`. `isNoOp` returns before touching the
+> bitmap, which is why this shipped on 10-25 and survived: it only fires once expansion, feather or
+> reverse is off zero. **Every user who touched a slider got a dead export.**
+
+Fixed in `2858d7c`: copy-then-write (`mask.copy(ARGB_8888, true)`), caller recycles the decoded
+original, and the dead `shortSideOverride` is now actually forwarded to `MaskPostProcess.apply`.
+All other `setPixels` call sites were audited and are safe (they write into `createBitmap` /
+`copy(..., true)` targets). Guarded by `MaskBitmapsMutabilityTest` (3 source-shape tests).
+
+⚠️ **The fixed APK was never installed** — the phone dropped off USB first. So the export that used
+to crash has not been re-run against the fix. `dist/Omelet-1.4.0-release-maskfix.apk`. That single
+tap is the first thing to do next session.
+
+**Lesson worth keeping:** a function with a fast path (`isNoOp` → return early) and a slow path is
+a hiding place. The slow path is the one that is broken, and it is the one no test exercises.
 
 **Do not** treat items 1–3 as "implement when the new model lands". They are the
 cheapest visible win we have, and they are *independent* of the model.
