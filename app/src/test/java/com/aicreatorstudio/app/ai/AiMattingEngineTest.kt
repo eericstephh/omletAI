@@ -58,9 +58,14 @@ class AiMattingEngineTest {
     }
 
     @Test
-    fun `temporal smoothing weight is a real blend`() {
-        val a = MediaPipeMattingEngine.TEMPORAL_ALPHA
-        assertTrue("alpha was $a", a > 0f && a < 1f)
+    fun `temporal filter scene-cut threshold is usable`() {
+        // The fixed TEMPORAL_ALPHA = 0.65 was replaced on 2026-10-29 by
+        // MattingTemporalFilter (median of three + scene-cut reset).
+        // The cut threshold must sit strictly inside (0, 1]: at 0 every
+        // frame would be a "cut" and nothing would ever be stabilised;
+        // above 1 the reset is unreachable and cut ghosting is guaranteed.
+        val t = MattingTemporalFilter.DEFAULT_SCENE_CUT_DIFF
+        assertTrue("threshold was $t", t > 0f && t <= 1f)
     }
 
     @Test

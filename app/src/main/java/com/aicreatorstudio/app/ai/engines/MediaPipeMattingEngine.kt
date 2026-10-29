@@ -16,6 +16,7 @@ import com.aicreatorstudio.app.ai.AiToolOptions
 import com.aicreatorstudio.app.ai.AiToolResult
 import com.aicreatorstudio.app.ai.CatalogEntry
 import com.aicreatorstudio.app.ai.MattingSidecar
+import com.aicreatorstudio.app.ai.MattingTemporalFilter
 import com.aicreatorstudio.app.ai.MaskPostProcess
 import com.aicreatorstudio.app.ai.MediaPipeNativeLib
 import com.aicreatorstudio.app.ai.NativeEngineFailure
@@ -157,31 +158,19 @@ class MediaPipeMattingEngine @Inject constructor(
     private val segmenterLock = Any()
 
     /**
-     * 2026-10-20 — the temporal-EMA state is now PER RUN, not a field
-     * on this `@Singleton`.
+     * 2026-10-20 — the temporal state is now PER RUN, not a field on
+     * this `@Singleton`.
      *
      * The previous frame's mask used to live in a `@Volatile` field on
      * the engine, so two overlapping runs (the user starts a second
-     * clip while the first is still going) interleaved their EMA
-     * state: clip B's mask was smoothed against clip A's previous
-     * frame. `release()` also nulled the field while a run was in
-     * flight.
+     * clip while the first is still going) interleaved their history:
+     * clip B's mask was smoothed against clip A's previous frame.
+     * `release()` also nulled the field while a run was in flight.
      *
-     * The state now travels with the run — see [MattingEmaState] —
-     * so a run can only ever see its own previous frame.
+     * 2026-10-29 — the state object is now [MattingTemporalFilter]
+     * (median-of-three + adaptive EMA + scene-cut reset) instead of a
+     * bare EMA. It is still constructed per run, for the same reason.
      */
-    private class MattingEmaState {
-        /** Previous frame's mask (model-resolution floats). */
-        var prev: FloatArray? = null
-        var width: Int = 0
-        var height: Int = 0
-
-        fun reset() {
-            prev = null
-            width = 0
-            height = 0
-        }
-    }
 
     override suspend fun ensureModelReady(onProgress: (Float) -> Unit): Result<Unit> {
         // installWithManifest: bundled-asset-first (offline), then
@@ -234,9 +223,9 @@ class MediaPipeMattingEngine @Inject constructor(
             // 2026-10-20 — the state belongs to the RUN, not to the
             // engine. It used to be a `@Volatile` field on this
             // `@Singleton`, so two overlapping runs interleaved their
-            // EMA history and clip B's mask was smoothed against clip
+            // history and clip B's mask was smoothed against clip
             // A's previous frame.
-            val ema = MattingEmaState()
+            val temporal = MattingTemporalFilter()
 
             // Step 1 - prepare the segmenter. Refuse to run if the
             // model isn't ready (shows Download instead of faking it).
@@ -323,10 +312,10 @@ class MediaPipeMattingEngine @Inject constructor(
             suspend fun consume(bmp: Bitmap, timeMs: Long) {
                 val alpha = withContext(Dispatchers.Default) {
                     val tInfer = System.nanoTime()
-                    // 2026-10-20 — the EMA state is this RUN's, passed
-                    // in explicitly, so a concurrent run on another
-                    // clip cannot interleave with it.
-                    val mask = segmentForFrame(seg, bmp, options, ema)
+                    // 2026-10-20 — the temporal state is this RUN's,
+                    // passed in explicitly, so a concurrent run on
+                    // another clip cannot interleave with it.
+                    val mask = segmentForFrame(seg, bmp, options, temporal)
                     timing.inferMs += (System.nanoTime() - tInfer) / 1_000_000L
                     mask
                 }
@@ -499,8 +488,8 @@ class MediaPipeMattingEngine @Inject constructor(
             segmenter = null
         }
         // 2026-10-20 — there is no engine-level temporal state to
-        // clear any more: the EMA buffer belongs to a single run (see
-        // [MattingEmaState]) and is dropped when that run ends.
+        // clear any more: the filter belongs to a single run (see
+        // [MattingTemporalFilter]) and is dropped when that run ends.
     }
 
     /**
@@ -720,9 +709,10 @@ class MediaPipeMattingEngine @Inject constructor(
      * The selfie-multiclass category mask holds per-pixel class
      * indices (0 = background, 1..5 = person-part classes: hair,
      * body-skin, face-skin, clothes, others). Nonzero is treated as
-     * foreground so the whole silhouette stays. The raw mask is
-     * temporally smoothed with an EMA against the previous frame's
-     * mask ([TEMPORAL_ALPHA]) to kill edge flicker. 2026-10-25: the
+     * foreground so the whole silhouette stays, which makes the raw
+     * mask **binary** — every pixel is 0 or 1, never a probability.
+     * Temporal stabilisation is [MattingTemporalFilter] (median of
+     * three → adaptive EMA → scene-cut reset); 2026-10-25: the
      * feather/expansion/reverse post-process moved out of this
      * function entirely — it now runs at composition time.
      */
@@ -730,7 +720,7 @@ class MediaPipeMattingEngine @Inject constructor(
         seg: ImageSegmenter,
         frame: Bitmap,
         options: AiToolOptions,
-        ema: MattingEmaState
+        temporal: MattingTemporalFilter
     ): Bitmap {
         // Bound the working resolution once per frame: uniform bilinear
         // downscale. The model ingests 256×256 internally, so this only
@@ -786,27 +776,28 @@ class MediaPipeMattingEngine @Inject constructor(
         byteBuffer.rewind()
         byteBuffer.get(maskBytes)
 
-        // Class -> foreground probability, then temporal EMA.
+        // Class -> foreground probability. Binary by construction: the
+        // segmenter is asked for a category mask, not confidence masks.
         val fg = FloatArray(maskW * maskH)
         for (i in 0 until maskW * maskH) {
             val cls = maskBytes[i].toInt() and 0xFF
             fg[i] = if (cls == 0) 0f else 1f
         }
-        val prev = ema.prev
-        if (prev != null && prev.size == fg.size && ema.width == maskW && ema.height == maskH) {
-            for (i in fg.indices) {
-                fg[i] = TEMPORAL_ALPHA * fg[i] + (1f - TEMPORAL_ALPHA) * prev[i]
-            }
-        }
-        ema.prev = fg.copyOf()
-        ema.width = maskW
-        ema.height = maskH
+        // Temporal stabilisation — isolated-change rejection (median of
+        // three), then an adaptive EMA, then a scene-cut reset. See
+        // [MattingTemporalFilter] for why the three stages are ordered
+        // that way and why a plain EMA was not enough.
+        val smoothed = temporal.apply(fg, maskW, maskH)
 
-        // Threshold + soft knee so hair/soft edges survive as
-        // partial alpha instead of a hard binary cut.
+        // 0..1 probability -> alpha byte. Because the model's mask is
+        // binary, the only partial alpha here is what the temporal
+        // filter produced; the soft *edge* is the feather pass at
+        // composition time (`MaskPostProcess.gaussianFeather`), not
+        // anything in this function. (An earlier KDoc claimed a "soft
+        // knee so hair survives" here — there never was one.)
         val alphaPixels = IntArray(maskW * maskH)
         for (i in 0 until maskW * maskH) {
-            val a = ((fg[i] * 255f).roundToInt()).coerceIn(0, 255)
+            val a = ((smoothed[i] * 255f).roundToInt()).coerceIn(0, 255)
             alphaPixels[i] = (a shl 24) or 0x00FFFFFF
         }
         val maskBitmap = Bitmap.createBitmap(maskW, maskH, Bitmap.Config.ARGB_8888)
@@ -839,7 +830,7 @@ class MediaPipeMattingEngine @Inject constructor(
          * Number of frames sampled per clip. 10 fps over a 60 s
          * clip is 600 frames; we cap at 600 to keep the sidecar
          * bounded. For longer clips the interval stretches out
-         * proportionally (temporal EMA bridges the gaps).
+         * proportionally ([MattingTemporalFilter] bridges the gaps).
          */
         const val MAX_FRAMES: Int = 600
 
@@ -853,12 +844,15 @@ class MediaPipeMattingEngine @Inject constructor(
          */
         const val MIN_SAMPLE_INTERVAL_MS: Long = 100L
 
-        /**
-         * Temporal EMA weight for the current frame's mask.
-         * 0.65 current / 0.35 history kills single-frame flicker
-         * without visible trailing on normal motion.
-         */
-        const val TEMPORAL_ALPHA: Float = 0.65f
+        // 2026-10-29 — there is no single temporal weight any more.
+        //
+        // `TEMPORAL_ALPHA = 0.65f` was a fixed blend that had to be slow
+        // enough to damp noise and fast enough to follow motion, and it
+        // could not be both: a one-frame false positive became a 0.65
+        // ghost that decayed over ~0.5 s, while fast motion trailed.
+        // The temporal policy now lives in [MattingTemporalFilter]
+        // ([MattingTemporalFilter.DEFAULT_BASE_ALPHA] is its still-frame
+        // weight; motion raises it to 1.0 adaptively).
 
         /**
          * The centralized model spec consumed by [AiModelInstaller].
