@@ -59,6 +59,7 @@ internal fun EditorMattingPanelSection(
         onExpansionChanged = knobActions.onExpansionChanged,
         onFeatherChanged = knobActions.onFeatherChanged,
         onReverseChanged = knobActions.onReverseChanged,
+        onKnobDragFinished = knobActions.onKnobDragFinished,
         onReset = { onResetAiTool("matting") },
         onEnsureModelReady = onEnsureMattingModelReady
     )
@@ -73,7 +74,12 @@ internal fun EditorMattingPanelSection(
 data class MattingPanelActions(
     val onExpansionChanged: (Float) -> Unit,
     val onFeatherChanged: (Float) -> Unit,
-    val onReverseChanged: (Boolean) -> Unit
+    val onReverseChanged: (Boolean) -> Unit,
+    /**
+     * 2026-10-30 — end-of-drag boundary for the two sliders. The knob
+     * setters open one undo entry per gesture instead of one per frame.
+     */
+    val onKnobDragFinished: () -> Unit = {}
 )
 
 /** No-op default; the real provider sits in `EditorScreen`. */
@@ -81,6 +87,7 @@ val LocalMattingPanelActions = staticCompositionLocalOf {
     MattingPanelActions(
         onExpansionChanged = {},
         onFeatherChanged = {},
-        onReverseChanged = {}
+        onReverseChanged = {},
+        onKnobDragFinished = {}
     )
 }

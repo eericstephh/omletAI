@@ -8968,7 +8968,9 @@ class EditorViewModel @Inject constructor(
             replacementBackgroundUri = uri.toString(),
             backgroundMode = mode
         )
-        persistMatting(clip.id, next)
+        // Picking a background is a discrete action, so it opens its own
+        // undo entry (2026-10-30 — nothing in this panel used to).
+        persistMatting(clip.id, next, pushHistory = true)
     }
 
     /**
@@ -8982,7 +8984,29 @@ class EditorViewModel @Inject constructor(
         // export fails with a precise message when it is missing);
         // ORIGINAL/BLUR/COLOR clear nothing but ignore the URI.
         val next = clip.matting.copy(backgroundMode = mode)
-        persistMatting(clip.id, next)
+        persistMatting(clip.id, next, pushHistory = true)
+    }
+
+    /**
+     * 2026-10-30 — undo boundary for the two continuous knobs.
+     *
+     * `setMattingExpansion` / `setMattingFeather` are called on every
+     * drag frame, so pushing history inside them would fill the 30-entry
+     * stack in well under a second (the same reason `setClipTrim` takes a
+     * `pushHistory` flag). One entry is opened on the first frame of a
+     * gesture and closed here, from the slider's
+     * `onValueChangeFinished`.
+     */
+    private var mattingKnobGestureOpen = false
+
+    fun endMattingKnobGesture() {
+        mattingKnobGestureOpen = false
+    }
+
+    private fun pushMattingKnobHistoryOnce() {
+        if (mattingKnobGestureOpen) return
+        historyDelegate.push()
+        mattingKnobGestureOpen = true
     }
 
     /**
@@ -8994,33 +9018,45 @@ class EditorViewModel @Inject constructor(
      */
     fun setMattingExpansion(value: Float) {
         val clip = _uiState.value.selectedClip ?: return
+        pushMattingKnobHistoryOnce()
         persistMatting(
             clip.id,
-            clip.matting.copy(expansion = value.coerceIn(-1f, 1f))
+            clip.matting.copy(expansion = value.coerceIn(-1f, 1f)),
+            pushHistory = false
         )
     }
 
     fun setMattingFeather(value: Float) {
         val clip = _uiState.value.selectedClip ?: return
+        pushMattingKnobHistoryOnce()
         persistMatting(
             clip.id,
-            clip.matting.copy(feather = value.coerceIn(0f, 1f))
+            clip.matting.copy(feather = value.coerceIn(0f, 1f)),
+            pushHistory = false
         )
     }
 
     fun setMattingReverse(value: Boolean) {
         val clip = _uiState.value.selectedClip ?: return
-        persistMatting(clip.id, clip.matting.copy(reverse = value))
+        // A toggle is a discrete tap, not a gesture.
+        persistMatting(clip.id, clip.matting.copy(reverse = value), pushHistory = true)
     }
 
     private fun persistMatting(
         clipId: String,
-        next: com.aicreatorstudio.app.model.MattingSettings
+        next: com.aicreatorstudio.app.model.MattingSettings,
+        pushHistory: Boolean
     ) {
         val project = _uiState.value.project ?: return
         val updatedClips = project.clips.map { c ->
             if (c.id != clipId) c else c.copy(matting = next)
         }
+        // 2026-10-30 — this used to push nothing, so NO change made in the
+        // Background Remove panel was undoable: pick a different
+        // background, drag feather, toggle reverse, and Undo either did
+        // nothing or jumped back past the whole engine run. The mask and
+        // the background are one decision, so they are one entry.
+        if (pushHistory) historyDelegate.push()
         _uiState.update { it.copy(project = project.copy(clips = updatedClips)) }
         projectRepository.saveAiTools(
             projectId = project.id,

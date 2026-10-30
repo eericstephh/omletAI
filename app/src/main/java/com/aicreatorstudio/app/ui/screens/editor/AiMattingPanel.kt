@@ -93,6 +93,14 @@ fun AiMattingPanel(
     onExpansionChanged: (Float) -> Unit = {},
     onFeatherChanged: (Float) -> Unit = {},
     onReverseChanged: (Boolean) -> Unit = {},
+    /**
+     * 2026-10-30 — fired when a knob drag ends. The two sliders report
+     * every frame, so the undo stack needs one boundary per gesture
+     * instead of one snapshot per frame (a 30-entry stack empties in
+     * under a second of dragging — the reason `setClipTrim` takes a
+     * `pushHistory` flag at all).
+     */
+    onKnobDragFinished: () -> Unit = {},
     onReset: () -> Unit,
     onEnsureModelReady: () -> Unit
 ) {
@@ -243,6 +251,7 @@ fun AiMattingPanel(
             ZeroSnapSlider(
                 value = settings.expansion.coerceIn(-1f, 1f),
                 onValueChange = onExpansionChanged,
+                onValueChangeFinished = onKnobDragFinished,
                 valueRange = -1f..1f,
                 enabled = aiState.status != AiToolStatus.Processing
             )
@@ -266,6 +275,7 @@ fun AiMattingPanel(
             ZeroSnapSlider(
                 value = settings.feather.coerceIn(0f, 1f),
                 onValueChange = onFeatherChanged,
+                onValueChangeFinished = onKnobDragFinished,
                 valueRange = 0f..1f,
                 // No zero tick: feather = 0 is a *state*, not the
                 // snap target — forcing the thumb to the middle of a

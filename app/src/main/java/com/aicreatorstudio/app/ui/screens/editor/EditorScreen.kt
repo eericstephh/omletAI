@@ -414,7 +414,8 @@ fun EditorScreen(
             MattingPanelActions(
                 onExpansionChanged = viewModel::setMattingExpansion,
                 onFeatherChanged = viewModel::setMattingFeather,
-                onReverseChanged = viewModel::setMattingReverse
+                onReverseChanged = viewModel::setMattingReverse,
+                onKnobDragFinished = viewModel::endMattingKnobGesture
             )
         }
     ) {
