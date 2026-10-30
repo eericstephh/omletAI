@@ -95,7 +95,7 @@ items below need **no new model**.
 | 1 | **Mask expansion / contraction** (grow or shrink the subject) | Draft field `matting.expansion` (`long`); `DilateErode` shader: `kernelSize = erode_dilate_kernel_size / 8`, `k >= 0` → 31-tap max (dilate), `k < 0` → 31-tap min + soft erosion `pow(clamp(min - (max-center)*(\|k\|/5), 0, 1), 1+\|k\|/4)` | **DONE 2026-10-26** — `MattingSettings.expansion` (−1..+1, normalized) + `MaskPostProcess.dilate`/`softErode` (exact O(N) deque max/min, the shader's soft-erode formula) at composition time; `گسترش سوژه` slider | **P0 ✅** |
 | 2 | **Normalised edge feather with gamma** | `blur_kernel_size / 100` → `inputEdgeSmooth` 0..1; separable 43-tap gaussian, `sigma 4`, `gamma 1.4` before and `1/1.4` after; collapses to 5 taps at 8× when `edgeSmooth < 0.2` | **DONE 2026-10-26** — `MattingSettings.feather` (0..1 normalized; done **without** the gamma-1.4 weighting — its direction was not verified, doc §11) + `MaskPostProcess.gaussianFeather` (3-box O(N)); `نرمی لبه` slider | **P0 ✅** (gamma) |
 | 3 | **Reverse selection** (keep background instead of subject) | `matting.reverse` (`boolean`) + `enable_reverse` → `mask = 1 - mask` at the end of the chain | **DONE 2026-10-26** — `MattingSettings.reverse` + `MaskPostProcess.invert` as the chain's last pass; `معکوس` toggle | **P0 ✅** |
-| 4 | **One shared post-process used by every consumer** | the mask is published as a single texture (`addUserTexture("#MattingMask")`) and every later stage reads it | **DONE 2026-10-26** — moved from generation-time to **composition-time**: `MaskPostProcess` (pure JVM) → `MaskBitmaps` (Bitmap bridge) → `AiExportHooks.maskFor` applies the chain on the raw sidecar mask at its native resolution, before the single rescale. Sliders persist immediately and take effect on the next export **without a re-run** — the parity property behind the "mask as algorithm layer" architecture. (The *preview* does not composite the mask at all — that is a pre-existing, separately tracked approximation, not a regression of this change.) | **P0 ✅** |
+| 4 | **One shared post-process used by every consumer** | the mask is published as a single texture (`addUserTexture("#MattingMask")`) and every later stage reads it | **DONE 2026-10-26** — moved from generation-time to **composition-time**: `MaskPostProcess` (pure JVM) → `MaskBitmaps` (Bitmap bridge) → `AiExportHooks.maskFor` applies the chain on the raw sidecar mask at its native resolution, before the single rescale. Sliders persist immediately and take effect on the next export **without a re-run** — the parity property behind the "mask as algorithm layer" architecture. **2026-10-30:** the preview composites the cutout too, for the solid-fill modes — see below. | **P0 ✅** |
 | 5 | **Temporal model for video** (`frashevery 15` + GRU) | `ai_matting_gru` graph (`forwardtype -1`, `model_name tt_matting_video_gru`) next to `ai_matting` (`forwardtype 0`); `matting_mp_frashevery = 15` | **PARTIAL 2026-10-29** — the *statistical* half is done without any new weights: `ai/MattingTemporalFilter.kt` replaces the fixed `TEMPORAL_ALPHA = 0.65` EMA with a median of three (a one-frame measurement is discarded, not dimmed) plus a scene-cut reset at 0.35 mean mask change. What remains is the actual recurrence: a GRU that knows what "the same subject" looks like across occlusions and re-entry. No model, no schedule. | **P1** (the learned half) |
 | 6 | **Atomic undo for "apply mask + new background"** | `DraftComboParams("image_editor_matting_apply")` / `("image_editor_matting_cancel")` | history exists, but mask + background are separate steps | **P1** |
 | 7 | **Interactive brush / eraser (VOS)** | `custom_matting` graph (`mobile_vos`, `mobile_vos_input_mask_type 1`), `AddCustomMattingReqStruct(brush_type, brush_size, brush_points)`, `LVVEMattingPenType` = fast 1 / general 2 / eraser 4 / fasteraser 8 (bitmask) | **absent** | **P2** (needs a VOS model) |
@@ -237,13 +237,18 @@ grade, custom font import, and 12 Persian fonts.
   the rectangle can differ.
 - The **blur-based transitions** preview their geometry and wash but not their
   blur.
-- **Background remove (matting)** computes the mask in a **post-pass at 10 fps**
-  and applies it at export; the preview never shows the live mask (the panel
-  says so). `SequentialFrameSampler` now decodes byte buffers like the export
-  does, so the `MediaMetadataRetriever` fallback that cost ~0.33 s per sample is
-  gone: measured on the Xiaomi 2107113SG a 36 s clip / 358 samples takes **120 s**
-  (`infer=112675ms write=7268ms`), down from 253 s. Inference is now the
-  bottleneck; the sampler is no longer a surface consumer at all.
+- **Background remove (matting)** computes the mask in a **post-pass at 10 fps** and applies it at export.
+  **2026-10-30 — the preview now composites it for `TRANSPARENT` and `COLOR`**: `MattingPreviewOverlay`
+  draws a plate whose alpha is the inverse of the mask (same `MaskPostProcess` chain, same short-side
+  mapping, same nearest-frame lookup via `MaskIndexMath`), so pressing the button visibly removes the
+  background instead of appearing to do nothing. `BLUR` / `IMAGE` / `VIDEO` remain export-only — they
+  need the background's own content, not a colour, and the panel hint says exactly that. The plate is
+  a sibling Compose node drawing its own bitmap: it does **not** capture or filter the video
+  `TextureView`, which is the pattern that broke the Play button twice (see the Layer 2.5 history in
+  `EditorScreen`). `SequentialFrameSampler` decodes byte buffers like the export does, so the
+  `MediaMetadataRetriever` fallback that cost ~0.33 s per sample is gone: measured on the Xiaomi
+  2107113SG a 36 s clip / 358 samples takes **120 s** (`infer=112675ms write=7268ms`), down from
+  253 s. Inference is now the bottleneck; the sampler is no longer a surface consumer at all.
 - **Export overlay / VIDEO-background samplers** were moved to byte-buffer decode
   with the export fix (2026-10-24) but have **not** been exercised on the device:
   the test project contains neither an overlay clip nor a video background. They

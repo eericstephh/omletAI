@@ -367,8 +367,12 @@ fun AiMattingPanel(
         if (settings.backgroundMode == MattingBackgroundMode.TRANSPARENT) {
             Spacer(Modifier.height(6.dp))
             Text(
+                // 2026-10-30 — the preview composites the cutout now, so
+                // the old blanket "the preview does not show this" would
+                // be a lie. What is still true: only the solid-fill modes
+                // are previewed, and the file is authoritative.
                 text = "پس‌زمینه حذف می‌شود؛ سوژه روی رنگ بوم پروژه می‌ماند. " +
-                    "پیش‌نمایش زنده این حذف را نشان نمی‌دهد — در خروجی اعمال می‌شود.",
+                    "پیش‌نمایش همین را نشان می‌دهد و خروجی مرجع نهایی است.",
                 color = LabelSecondary,
                 style = MaterialTheme.typography.labelSmall
             )
@@ -442,13 +446,19 @@ fun AiMattingPanel(
             onCancel = onCancel
         )
 
-        // 2026-10-19 — expectation setting. The live preview cannot sample
-        // the player's surface, so a finished run only adds a "ready" chip
-        // to the canvas; the cutout itself appears in the exported file.
-        // Without this line the tool reads as "nothing happened".
+        // 2026-10-19 — expectation setting. Originally the live preview
+        // could not sample the player's surface at all, so a finished run
+        // only added a "ready" chip and the cutout appeared in the file
+        // only. Without this line the tool read as "nothing happened".
+        //
+        // 2026-10-30 — the preview composites the cutout for the
+        // solid-fill modes (see `MattingPreviewOverlay`), so the note is
+        // narrowed to what is still export-only instead of repeating the
+        // blanket claim.
         Spacer(Modifier.height(8.dp))
         Text(
-            text = "نتیجه در ویدیوی خروجی اعمال می‌شود؛ پیش‌نمایش زنده ماسک را نشان نمی‌دهد.",
+            text = "حذف/رنگ در پیش‌نمایش دیده می‌شود. پس‌زمینه‌ی تار، عکس و ویدیو " +
+                "فقط در خروجی اعمال می‌شوند.",
             color = LabelPrimary.copy(alpha = 0.6f),
             style = MaterialTheme.typography.labelSmall
         )

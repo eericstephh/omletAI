@@ -3501,6 +3501,32 @@ private fun EditorVideoPreviewSection(
                 // `AndroidView`'s modifier chain either. The whole design is one
                 // paint, on the TextureView, set from the `SideEffect` above.
 
+                // Layer 2.55 — 2026-10-30, the Background Remove composite.
+                //
+                // Until now the matting mask was applied at export only, so a
+                // user who ran the pass and pressed play saw the untouched
+                // clip. The panel said so in a hint, but the honest reading of
+                // that screen is "the feature does nothing".
+                //
+                // This is NOT the forbidden pattern above: it does not try to
+                // capture or filter the TextureView's layer. It draws its own
+                // bitmap — a flat fill whose alpha is the inverse of the mask —
+                // as a sibling node on top. No `saveLayer`, no `RenderEffect`,
+                // nothing that has to read back the video surface, so the two
+                // bugs documented at Layer 2.5 cannot be re-opened here.
+                //
+                // It sits BELOW the transition washes (2.6) on purpose: a
+                // flash/fade covers the whole composited frame, the plate
+                // included.
+                if (sourceClip != null) {
+                    MattingPreviewOverlay(
+                        projectId = uiState.project?.id,
+                        clip = sourceClip,
+                        projectPositionMs = currentPositionMs,
+                        canvasFillArgb = letterboxColor.toArgb()
+                    )
+                }
+
                 // Layer 2.6 — PHASE A transition washes (fade / flash).
                 //
                 // The export paints these as three TextureOverlays in
