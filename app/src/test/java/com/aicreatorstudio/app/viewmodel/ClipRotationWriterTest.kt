@@ -127,7 +127,6 @@ class ClipRotationWriterTest {
     }
 
     private val viewModel = "app/src/main/java/com/aicreatorstudio/app/viewmodel/EditorViewModel.kt"
-    private val delegate = "app/src/main/java/com/aicreatorstudio/app/viewmodel/AdjustmentDelegate.kt"
     private val editorScreen = "app/src/main/java/com/aicreatorstudio/app/ui/screens/editor/EditorScreen.kt"
     private val renderGraph = "app/src/main/java/com/aicreatorstudio/app/export/RenderGraphBuilder.kt"
 
@@ -175,15 +174,6 @@ class ClipRotationWriterTest {
         assertTrue(
             "the export combines the clip's rotation with the transform's",
             graph.contains("normaliseRotation(rotation + transform.rotation)")
-        )
-    }
-
-    @Test
-    fun `the adjustment delegate writes the clip too`() {
-        val src = source(delegate)
-        assertTrue(
-            "the delegate must write the clip's rotation",
-            src.contains("mutateClip(id) { copy(rotation = v) }")
         )
     }
 

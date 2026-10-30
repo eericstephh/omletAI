@@ -89,7 +89,6 @@ fun restoreDocumentFrom(
     isTextEditMode = current.isTextEditMode,
     isTrimMode = current.isTrimMode,
     activeSubtitleId = current.activeSubtitleId,
-    activeWordId = current.activeWordId,
     mediaMissingClips = current.mediaMissingClips,
     // --- history flags are owned by the caller, not the snapshot ---
     canUndo = current.canUndo,

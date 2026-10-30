@@ -332,13 +332,12 @@ data class EditorUiState(
      * word in a different style in real time.
      */
     val activeSubtitleId: String? = null,
-    /**
-     * ID of the [com.aicreatorstudio.app.ai.TranscribedWord] currently
-     * being spoken inside the [activeSubtitleId] overlay. Recomputed
-     * by the ViewModel on every playhead tick; the preview reads this
-     * to drive karaoke-style word highlighting.
-     */
-    val activeWordId: String? = null,
+    // 2026-10-30 — `activeWordId` was removed. The ViewModel recomputed it
+    // on EVERY playhead tick (walking the overlay list twice), the only
+    // consumer turned it into a `TranscribedWord` for a preview parameter
+    // that was never read, and the shared caption renderer derives the
+    // active word from `frameTimeMs` itself. Per-frame work feeding a dead
+    // parameter is worse than dead code: it costs the user frame time.
     /**
      * When non-null, the screen should pop the system "Save as" file
      * picker seeded with this suggested SRT file name. The ViewModel

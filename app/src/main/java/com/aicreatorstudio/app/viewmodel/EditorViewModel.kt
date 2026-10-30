@@ -251,7 +251,15 @@ class EditorViewModel @Inject constructor(
 
     // -- Domain delegates -----------------------------------
     val timeline = TimelineDelegate(_uiState, historyDelegate)
-    val adjustment = AdjustmentDelegate(_uiState, historyDelegate)
+    // 2026-10-30 — `AdjustmentDelegate` used to live here. It was
+    // constructed and never called: every one of its methods had a
+    // duplicate on this class, and the duplicates were the ones the UI
+    // used. Worse, the delegate's copies mutated the state WITHOUT
+    // persisting (`mutateClip` had no `persistClips()`), so wiring it up
+    // as a "cleanup" would have reintroduced the exact silent-no-persist
+    // bug class this project keeps paying for. Deleted rather than
+    // promoted: `onBrightnessChanged` here calls `updateClipBrightness`,
+    // which persists.
     val subtitle = SubtitleDelegate(_uiState, historyDelegate)
     val transition = TransitionDelegate(_uiState, historyDelegate)
     val export = ExportDelegate(_uiState, exportEngine, viewModelScope)
@@ -605,14 +613,12 @@ class EditorViewModel @Inject constructor(
             if (it.isScrubbing) {
                 it.copy(playbackPositionMs = positionMs)
             } else {
-                val active = activeSubtitleIdAt(positionMs, it.textOverlays)
-                val activeWordId = if (active != null) {
-                    activeWordIdAt(positionMs, it.textOverlays, active)
-                } else null
+                // 2026-10-30 — this is the per-tick path, so it only does
+                // what something reads. `activeWordId` used to be computed
+                // here too, twice per tick, for a dead parameter.
                 it.copy(
                     playbackPositionMs = positionMs,
-                    activeSubtitleId = active,
-                    activeWordId = activeWordId
+                    activeSubtitleId = activeSubtitleIdAt(positionMs, it.textOverlays)
                 )
             }
         }
@@ -628,8 +634,7 @@ class EditorViewModel @Inject constructor(
             val active = activeSubtitleIdAt(ms, it.textOverlays)
             it.copy(
                 playbackPositionMs = ms,
-                activeSubtitleId = active,
-                activeWordId = if (active != null) activeWordIdAt(ms, it.textOverlays, active) else null
+                activeSubtitleId = active
             )
         }
         persistProjectMeta()
@@ -685,8 +690,7 @@ class EditorViewModel @Inject constructor(
             val active = activeSubtitleIdAt(pos, it.textOverlays)
             it.copy(
                 isScrubbing = false,
-                activeSubtitleId = active,
-                activeWordId = if (active != null) activeWordIdAt(pos, it.textOverlays, active) else null
+                activeSubtitleId = active
             )
         }
         persistProjectMeta()
@@ -729,16 +733,6 @@ class EditorViewModel @Inject constructor(
      * [positionMs]. Linear scan is fine because each subtitle only
      * carries a handful of words.
      */
-    private fun activeWordIdAt(
-        positionMs: Long,
-        overlays: List<com.aicreatorstudio.app.model.TextOverlay>,
-        subtitleId: String
-    ): String? {
-        val subtitle = overlays.firstOrNull { it.id == subtitleId } ?: return null
-        if (!subtitle.karaokeEnabled || subtitle.words.isEmpty()) return null
-        return subtitle.activeWordAt(positionMs)?.id
-    }
-
     /**
      * Returns the absolute, timeline-space millisecond position of the
      * playhead. Re-exported so the timeline and the player agree on
@@ -1167,9 +1161,11 @@ class EditorViewModel @Inject constructor(
      * panel displays the clip's values (`clip.brightness`,
      * `clip.rotation`, …), so resetting only the global mirror left
      * the visible values untouched — the button looked like it did
-     * nothing. [AdjustmentDelegate.resetEffects] already had the
-     * correct semantics (global + clip); the live implementation did
-     * not, and the delegate was never wired up.
+     * nothing.
+     *
+     * 2026-10-30 — the old `AdjustmentDelegate` is gone. It had the
+     * correct global+clip semantics but was never called, and its
+     * clip write did not persist. This function is the only reset.
      */
     fun resetEffects() {
         historyDelegate.push()

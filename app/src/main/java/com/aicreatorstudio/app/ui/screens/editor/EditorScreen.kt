@@ -1693,13 +1693,12 @@ private fun EditorScreenBody(
             sourceAspect = if (activeClip != null && activeClip.width > 0 && activeClip.height > 0)
                 activeClip.width.toFloat() / activeClip.height.toFloat() else 16f / 9f,
             activeSubtitle = uiState.textOverlays.firstOrNull { it.id == uiState.activeSubtitleId },
-            // Word-level karaoke highlight. The ViewModel already
-            // looked up the active word inside the active subtitle;
-            // we just find the corresponding TranscribedWord so the
-            // preview can render it in a different colour.
-            activeWord = uiState.textOverlays
-                .firstOrNull { it.id == uiState.activeSubtitleId }
-                ?.words?.firstOrNull { it.id == uiState.activeWordId },
+            // 2026-10-30 — the `activeWord` argument is gone. The ViewModel
+            // computed `activeWordId` on every position change, this call
+            // site turned it into a TranscribedWord, and the composable
+            // never read the parameter: the shared caption renderer derives
+            // the active word from `frameTimeMs` itself. So the whole chain
+            // was per-frame work feeding a dead parameter.
             // Per-clip visual state. The Filters panel sets the global
             // selectedEffect but the per-clip `videoEffect` wins when a
             // clip is selected, so the chosen effect stays attached to
@@ -2687,13 +2686,12 @@ private fun EditorVideoPreviewSection(
     sourceClip: com.aicreatorstudio.app.model.VideoClip?,
     sourceAspect: Float,
     activeSubtitle: com.aicreatorstudio.app.model.TextOverlay?,
-    /**
-     * Word currently being spoken inside [activeSubtitle], if any.
-     * Used to draw the karaoke-style word highlight on top of the
-     * subtitle text. When null (or the subtitle has no word timing)
-     * the highlight is suppressed.
-     */
-    activeWord: com.aicreatorstudio.app.ai.TranscribedWord?,
+    // 2026-10-30 — the `activeWord` parameter was removed. It was passed
+    // by the only live call site and never read in the body: the shared
+    // renderer derives the active word from `frameTimeMs`. Keeping a
+    // parameter that exists only to be forwarded is this project's
+    // documented bug class ("a forwarded-only parameter eventually stops
+    // being forwarded"), so the dead end was cut instead of documented.
     // Per-clip visual state. When `sourceClip` is non-null the per-clip
     // values win; otherwise we fall back to the global editor state.
     selectedEffect: VideoEffect,
