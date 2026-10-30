@@ -5,6 +5,8 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import kotlin.math.abs
+import kotlin.math.pow
 
 /**
  * Tests for [MaskPostProcess] — the composition-time mask chain
@@ -256,5 +258,120 @@ class MaskPostProcessTest {
         // be partial alpha, not a binary jump.
         val a = got.at(5, edge - 3, w)
         assertTrue("expected partial alpha at the moved edge, got $a", a > 0.05f && a < 0.95f)
+    }
+
+    // ------------------------------------------------------------------
+    // feather gamma weighting (shader's blur(m^1.4)^(1/1.4))
+    // ------------------------------------------------------------------
+
+    /** Row (at column 5) where alpha first reaches [level] scanning top-down. */
+    private fun firstRowAt(got: FloatArray, w: Int, h: Int, level: Float): Int {
+        for (y in 0 until h) if (got.at(5, y, w) >= level) return y
+        return h
+    }
+
+    @Test
+    fun `gamma weighting on a binary mask is exactly the post power`() {
+        // 0 and 1 are fixed points of any power, so the PRE power is a
+        // no-op on a hard-edged mask and the whole weighting reduces to
+        // `plainBlur ^ (1/1.4)`. This pins the formula AND pins that it
+        // wraps the three box passes as a group — per-pass application
+        // would compound to (1/1.4)^3 and fail here.
+        val w = 60
+        val h = 51
+        val src = verticalEdgeMask(w, h, edge = 17)
+        val ungated = src.copyOf().also {
+            MaskPostProcess.gaussianFeather(it, w, h, sigmaPx = 3f, gamma = 1f)
+        }
+        val got = src.copyOf().also {
+            MaskPostProcess.gaussianFeather(it, w, h, sigmaPx = 3f)
+        }
+        val expected = FloatArray(ungated.size) {
+            ungated[it].pow(1f / MaskPostProcess.FEATHER_GAMMA)
+        }
+        for (i in expected.indices) {
+            assertEquals("index $i", expected[i], got[i], 1e-6f)
+        }
+        // Sanity: the weighting actually changed something.
+        assertTrue("gamma had no effect", (0 until got.size).any { abs(got[it] - ungated[it]) > 1e-3f })
+    }
+
+    @Test
+    fun `gamma weighting leaves a constant field exactly constant`() {
+        // The pre/post powers are inverses, so flat foreground and flat
+        // background must survive untouched. This is the invariant that
+        // makes the weighting safe: it cannot dim the subject or lift
+        // the background, only reshape the ramp between them.
+        val w = 32
+        val h = 24
+        for (v in listOf(0f, 0.37f, 1f)) {
+            val src = FloatArray(w * h) { v }
+            MaskPostProcess.gaussianFeather(src, w, h, sigmaPx = 4f)
+            for (i in src.indices) assertEquals("v=$v index $i", v, src[i], 1e-5f)
+        }
+    }
+
+    @Test
+    fun `gamma weighting pushes the edge contour outward`() {
+        // The 50 % contour of the weighted ramp must sit closer to the
+        // background side than the plain blur's. If FEATHER_GAMMA is ever
+        // flipped to its reciprocal (the other reading of the shader),
+        // this is the test that fires.
+        val w = 60
+        val h = 51
+        val edge = 17
+        val src = verticalEdgeMask(w, h, edge)
+        val ungated = src.copyOf().also {
+            MaskPostProcess.gaussianFeather(it, w, h, sigmaPx = 3f, gamma = 1f)
+        }
+        val got = src.copyOf().also {
+            MaskPostProcess.gaussianFeather(it, w, h, sigmaPx = 3f)
+        }
+        val plain = firstRowAt(ungated, w, h, 0.5f)
+        val weighted = firstRowAt(got, w, h, 0.5f)
+        assertTrue(
+            "expected the contour to move outward (row $weighted < $plain)",
+            weighted < plain
+        )
+    }
+
+    @Test
+    fun `gamma weighting never runs when the feather is a no-op`() {
+        // feather = 0 skips the blur; the weighting is then an identity,
+        // so the chain must be bit-identical to the expansion-only path.
+        // This is what keeps the gamma from disturbing the isNoOp path.
+        val w = 40
+        val h = 40
+        val src = verticalEdgeMask(w, h)
+        val got = MaskPostProcess.apply(src.copyOf(), w, h, 0.5f, 0f, false)
+        val expected = src.copyOf().also {
+            MaskPostProcess.dilate(it, w, h, MaskPostProcess.expansionRadiusPx(0.5f, 40))
+        }
+        assertTrue(expected.contentEquals(got))
+    }
+
+    @Test
+    fun `gamma pass clamps out-of-range input instead of producing NaN`() {
+        // Math.pow returns NaN for a negative base with a fractional
+        // exponent, and one NaN would spread across the whole mask
+        // through the blur's window sums.
+        val v = floatArrayOf(-0.5f, 0f, 0.5f, 1f, 2f)
+        MaskPostProcess.gammaPass(v, MaskPostProcess.FEATHER_GAMMA)
+        for (i in v.indices) {
+            assertFalse("index $i is NaN", v[i].isNaN())
+            assertTrue("index $i out of range: ${v[i]}", v[i] in 0f..1f)
+        }
+        assertEquals(0f, v[0], 1e-6f)
+        assertEquals(0f, v[1], 1e-6f)
+        assertEquals(1f, v[3], 1e-6f)
+        assertEquals(1f, v[4], 1e-6f)
+    }
+
+    @Test
+    fun `gamma pass with exponent 1 is a no-op`() {
+        val v = floatArrayOf(0f, 0.1f, 0.5f, 0.9f, 1f)
+        val expected = v.copyOf()
+        MaskPostProcess.gammaPass(v, 1f)
+        assertTrue(expected.contentEquals(v))
     }
 }

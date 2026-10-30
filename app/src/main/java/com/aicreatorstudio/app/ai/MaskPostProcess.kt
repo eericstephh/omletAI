@@ -23,7 +23,9 @@ import kotlin.math.sqrt
  *    `pow(clamp(min − (max − center)·(|k|/5), 0, 1), 1 + |k|/4)`.
  * 2. **Feather** (`feather`): separable Gaussian, implemented as the
  *    classical 3-pass box blur (indistinguishable from a real Gaussian
- *    at these radii and O(N) regardless of radius).
+ *    at these radii and O(N) regardless of radius), wrapped in the
+ *    shader's gamma weighting `blur(m^1.4)^(1/1.4)` — see
+ *    [FEATHER_GAMMA].
  * 3. **Reverse**: `mask ← 1 − mask`.
  *
  * ## Units
@@ -39,9 +41,10 @@ import kotlin.math.sqrt
  *   reach is `shortSide / 240 · 12.5 = shortSide / 19.2` pixels.
  * - `feather ∈ 0..1`. `1.0` ≈ CapCut's `inputEdgeSmooth = 1.0`, whose
  *   Gaussian sigma is `4 / 240 · shortSide = shortSide / 60` pixels.
- * - CapCut's gamma-1.4 pre/post weighting around the blur exists in its
- *   shader but its exact direction was **not verified** (doc §11); this
- *   implementation deliberately omits it rather than guess.
+ *
+ * The gamma weighting around the blur *is* implemented (2026-10-29);
+ * see [FEATHER_GAMMA] for the formula, the evidence, and the one
+ * remaining ambiguity in it.
  *
  * ## Performance
  *
@@ -71,6 +74,52 @@ object MaskPostProcess {
 
     /** Default [feather] for freshly created settings (≈ the old 2 `featherPx` at a 720-side mask). */
     const val DEFAULT_FEATHER: Float = 0.15f
+
+    /**
+     * The DilateErode shader's edge-smooth weighting: the mask is
+     * raised to this power **before** the Gaussian and to its
+     * reciprocal **after** it —
+     *
+     * ```
+     * out = blur(mask ^ 1.4) ^ (1 / 1.4)
+     * ```
+     *
+     * ### Why this is safe
+     *
+     * The two powers are exact inverses, so any *constant* field
+     * survives unchanged: flat foreground stays 1, flat background
+     * stays 0. The weighting therefore cannot shift or dim the mask
+     * as a whole — it only reshapes the ramp the blur creates. It is
+     * also the identity when the blur is skipped, which is why it can
+     * never disturb the `isNoOp` fast path.
+     *
+     * ### What it does to the edge
+     *
+     * The pre-power darkens midtones (`m^1.4 ≤ m`), the post-power
+     * lifts them back (`x^(1/1.4) ≥ x`), so on a step edge the
+     * composite is `Φ^(1/1.4)` where `Φ` is the plain blurred ramp:
+     * the 50 % crossing moves *outward* (to ≈ 0.61) and the falloff
+     * steepens on the outside while gaining a longer inner tail. Net
+     * effect at `feather = 1` is roughly a 20 % outward bias of the
+     * contour with the same total reach.
+     *
+     * ### Evidence and the remaining ambiguity
+     *
+     * The ordering is recorded as **observed** in
+     * `docs/CAPCUT_RE_BACKGROUND_REMOVAL_2026-10-25.md` §8.5
+     * ("`gamma = 1.4` before and `1/1.4` after") and it is *not* in
+     * that doc's §11 list of unconfirmed items; the earlier note in
+     * this file claiming the direction was unverified was a hedge
+     * without a source and has been removed.
+     *
+     * What genuinely cannot be settled from the shader dump is which
+     * of the two exponents is applied first. The other reading —
+     * `blur(m^(1/1.4))^1.4` — is the mirror image (an *inward* bias
+     * of the same magnitude). §8.5 is taken literally here; flipping
+     * this constant to its reciprocal is the entire change if a
+     * device comparison ever shows the opposite.
+     */
+    const val FEATHER_GAMMA: Float = 1.4f
 
     /**
      * Below this sigma the 3-box Gaussian degenerates to zero-radius
@@ -200,15 +249,56 @@ object MaskPostProcess {
      * these sigma values visually indistinguishable from a true
      * Gaussian and O(N) regardless of radius). Edges are clamped
      * (replicated), matching the shader's `proc_border 1` semantics.
+     *
+     * When [gamma] differs from 1 the whole blur is wrapped in the
+     * shader's weighting: `blur(m^γ)^(1/γ)` — see [FEATHER_GAMMA].
+     * Note it wraps the *three passes as a group*, not each pass;
+     * per-pass application would compound into `γ³`.
+     *
+     * @param gamma the pre-blur exponent; `1f` disables the weighting
+     *   and reproduces the plain Gaussian (kept for tests and for
+     *   isolating the gamma's visual effect).
      */
-    fun gaussianFeather(alpha: FloatArray, w: Int, h: Int, sigmaPx: Float) {
+    fun gaussianFeather(
+        alpha: FloatArray,
+        w: Int,
+        h: Int,
+        sigmaPx: Float,
+        gamma: Float = FEATHER_GAMMA
+    ) {
         if (sigmaPx < MIN_USEFUL_SIGMA || w <= 0 || h <= 0) return
+        // gamma == 1f must stay bit-identical to the old plain blur.
+        val weighted = gamma > 0f && gamma != 1f
+        if (weighted) gammaPass(alpha, gamma)
         val radii = boxesForGauss(sigmaPx.toDouble(), 3)
         val tmp = FloatArray(alpha.size)
         for (r in radii) {
             if (r <= 0) continue
             boxPass(alpha, tmp, w, h, horizontal = true, radius = r)
             boxPass(tmp, alpha, w, h, horizontal = false, radius = r)
+        }
+        if (weighted) gammaPass(alpha, 1f / gamma)
+    }
+
+    /**
+     * `alpha ← alpha^exponent` for every pixel, clamped to 0..1 first.
+     *
+     * The clamp is not cosmetic: `Math.pow` returns **NaN** for a
+     * negative base with a fractional exponent, and one NaN spreads
+     * across the whole mask through the blur's window sums. A mask
+     * should already be in 0..1 (8-bit source, and every pass in this
+     * file is a convex combination), so this only ever guards against
+     * a caller handing us garbage.
+     *
+     * Cost: two extra full sweeps of `pow` per mask. That is a few
+     * milliseconds at sidecar resolution — small next to the model
+     * forward pass, and it only runs when the blur runs. A 256-entry
+     * LUT would make it free if export profiling ever flags it.
+     */
+    fun gammaPass(alpha: FloatArray, exponent: Float) {
+        if (exponent == 1f) return
+        for (i in alpha.indices) {
+            alpha[i] = alpha[i].coerceIn(0f, 1f).pow(exponent)
         }
     }
 
