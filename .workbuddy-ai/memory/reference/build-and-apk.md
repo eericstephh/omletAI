@@ -27,22 +27,29 @@ Fallback when the wrapper's JDK is wrong — pin **JDK 21**, because Gradle 8.13
 - `WhisperLargeV3LockfileTest` — stale; asserts a `whisper-large-v3` catalog entry that no longer exists
   (the offline catalog is Small-only) and that tiny/small were removed.
 
-### ⚠️ `compileDebugUnitTestKotlin` is RED since 2026-09-21
+### ✅ `compileDebugUnitTestKotlin` is GREEN again (verified 2026-10-30)
 
-`WhisperDownloadUrlTest` + `WhisperLargeV3Download{,Pipeline,Resilience}Test` reference removed constants, so
-the **whole test source set** fails to compile. Workaround:
+**This section used to describe a mandatory park/restore workaround. It is obsolete — do not run it.**
 
-```bash
-mkdir -p build/tmp/stale-tests
-for f in WhisperDownloadUrlTest WhisperLargeV3DownloadTest \
-         WhisperLargeV3DownloadPipelineTest WhisperLargeV3DownloadResilienceTest; do
-  mv "app/src/test/java/com/aicreatorstudio/app/ai/$f.kt" build/tmp/stale-tests/
-done
-./gradlew testDebugUnitTest --offline
-mv build/tmp/stale-tests/*.kt app/src/test/java/com/aicreatorstudio/app/ai/   # restore
+Verified on 2026-10-30 by running the task with **nothing parked**:
+
+```
+> Task :app:compileDebugUnitTestKotlin
+BUILD SUCCESSFUL
 ```
 
-`assembleDebug` is unaffected by this.
+(the line carries no `UP-TO-DATE` suffix, so the task really ran.)
+
+History, so the next reader knows why the note existed and can tell if it comes back: in September
+`WhisperDownloadUrlTest` plus `WhisperLargeV3Download{,Pipeline,Resilience}Test` referenced removed
+constants and broke the whole test source set. The 2026-10-27 whisper.cpp / ggml re-copy fixed it,
+and of the four files only `WhisperDownloadUrlTest` still exists — the other three are gone.
+
+If the task ever goes red again, the honest first move is to **read the `^e:` lines** and fix or
+delete the offending test, not to restore the parking dance. Parking hides a red build behind a
+manual ritual that only the person who remembers the ritual can perform.
+
+`assembleDebug` was never affected either way.
 
 ### ⚠️ Assemble in a separate invocation
 

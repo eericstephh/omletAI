@@ -16,8 +16,10 @@
 - ~3000 tests, 3–6 min → background; grep `^e:` / `BUILD`. Release builds are 5–9 min → pass
   `timeout: 600000`, never the 120 s default.
 - Never-chase: `RealModelInstallTest`, `WhisperNativeSymbolsTest`, `WhisperLargeV3LockfileTest`.
-- ⚠️ `compileDebugUnitTestKotlin` RED since 2026-09-21 (stale Whisper tests) — park in
-  `build/tmp/stale-tests/`, run, restore. `assembleDebug` unaffected.
+- ⚠️ ~~`compileDebugUnitTestKotlin` RED since 2026-09-21~~ — **NOT TRUE as of 2026-10-30.**
+  Verified by running the task with no files parked: `> Task :app:compileDebugUnitTestKotlin`
+  succeeded. The park-in-`build/tmp/stale-tests/` dance is **no longer needed**; stop doing it on
+  reflex. (It was real in September and was fixed by the 2026-10-27 whisper.cpp re-copy.)
 - ⚠️ Build as a **separate invocation** from tests, and **`rm` the APK first** (incremental `package`
   keeps dead bytes). Verify by mtime + DEX grep.
 

@@ -47,7 +47,24 @@ first. Persist **both** tables (`persistClips()` + `persistProjectMeta()`).
 
 Guarded by `AudioLaneLifecycleWiringTest`.
 
-Still open: `audioClips` never reaches `RenderGraphBuilder`.
+⚠️ **Corrected 2026-10-30: "`audioClips` never reaches `RenderGraphBuilder`" was WRONG and is not a
+gap.** Verified in the source: `VideoProject` has two different lists, and only one of them is an
+export input.
+
+- `VideoProject.clips` — every timeline item, including **audio-only** `VideoClip`s
+  (`isAudioOnly`, with `audioCategory` = `music` / `sfx` / **`voice`**, which is where a voiceover
+  take lands). `RenderGraphBuilder` splits these into `audioSegments`, and `VideoExportEngine`
+  mixes each into its own Media3 sequence. **So music, SFX and voiceover do export.**
+- `VideoProject.audioClips` — the **"Video Audio" lane mirror**, one `AudioClip` per video clip,
+  keyed by `originVideoClipId`. It is a *timeline/UI* structure and is deliberately not an export
+  input: the clip's own audio is muxed by the video transcode. What the export consumes instead is
+  `RenderSegment.volume` / `fadeInMs` / `fadeOutMs`, mapped from `VideoClip` in
+  `RenderGraphBuilder` (`volume =`, `fadeInMs =`, `fadeOutMs =`) and baked by
+  `VolumeScalingAudioProcessor` + `AudioFade`.
+
+The real consequence of the split is the invariant above: the two lists must be kept in step by
+every mutator, because the UI lane is the mirror of state the export reads from the clip.
+
 
 ## Per-clip persistence — `ClipAiTools` is the carrier
 

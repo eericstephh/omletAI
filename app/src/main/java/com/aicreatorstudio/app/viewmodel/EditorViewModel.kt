@@ -38,6 +38,7 @@ import com.aicreatorstudio.app.model.AudioExtractionPlanner
 import com.aicreatorstudio.app.model.CustomFont
 import com.aicreatorstudio.app.model.CustomFontMessages
 import com.aicreatorstudio.app.model.EditorUiState
+import com.aicreatorstudio.app.model.PairedAudio
 import com.aicreatorstudio.app.model.PersianFont
 import com.aicreatorstudio.app.model.SubtitleMessages
 import com.aicreatorstudio.app.model.SubtitleEditOps
@@ -3668,8 +3669,10 @@ class EditorViewModel @Inject constructor(
         val validation = validateTrim(clipId, newStartMs, newEndMs)
         if (validation != TrimValidation.Valid) return
         if (pushHistory) historyDelegate.push()
+        var audioTouched = false
         _uiState.update { state ->
             val project = state.project ?: return@update state
+            var trimmed: VideoClip? = null
             val clips = project.clips.map { clip ->
                 if (clip.id != clipId) return@map clip
                 val oldStart = clip.timelineStartMs.takeIf { it >= 0 } ?: 0L
@@ -3687,11 +3690,24 @@ class EditorViewModel @Inject constructor(
                     timelineStartMs = newStartMs.coerceAtLeast(0L),
                     trimStartMs = nextStart,
                     trimEndMs = nextEnd
-                )
+                ).also { trimmed = it }
             }
-            state.copy(project = project.copy(clips = clips))
+            // Paired-audio invariant (2026-10-30): the "Video Audio" tile
+            // is a separate object and nothing moved it with the clip, so
+            // trimming a clip slid the tile out from under it and left it
+            // playing from the untrimmed head. One shared rule now —
+            // `PairedAudio.mirrorGeometry` — so the next mutator added
+            // cannot forget the other half.
+            val next = trimmed ?: return@update state
+            val audioClips = project.audioClips.map { audio ->
+                if (audio.originVideoClipId != clipId) return@map audio
+                audioTouched = true
+                PairedAudio.mirrorGeometry(audio, next)
+            }
+            state.copy(project = project.copy(clips = clips, audioClips = audioClips))
         }
         persistClips()
+        if (audioTouched) persistProjectMeta()
     }
 
     /**
@@ -3778,14 +3794,26 @@ class EditorViewModel @Inject constructor(
     // Per-clip properties
     fun updateClipVolume(clipId: String, volume: Float) {
         historyDelegate.push()
+        var audioTouched = false
         _uiState.update { state ->
             val project = state.project ?: return@update state
+            val v = volume.coerceIn(0f, 2f)
             val clips = project.clips.map { clip ->
-                if (clip.id == clipId) clip.copy(volume = volume.coerceIn(0f, 2f)) else clip
+                if (clip.id == clipId) clip.copy(volume = v) else clip
             }
-            state.copy(project = project.copy(clips = clips))
+            // 2026-10-30 — mirror into the "Video Audio" tile, so the
+            // tile's own slider (which reads `AudioClip.volume`) shows the
+            // level the preview and the export are actually using. The
+            // reverse direction is `updateAudioClipVolume`.
+            val audioClips = project.audioClips.map { audio ->
+                if (audio.originVideoClipId != clipId) return@map audio
+                audioTouched = true
+                PairedAudio.withVideoVolume(audio, v)
+            }
+            state.copy(project = project.copy(clips = clips, audioClips = audioClips))
         }
         persistClips()
+        if (audioTouched) persistProjectMeta()
     }
 
     /**
@@ -3793,36 +3821,76 @@ class EditorViewModel @Inject constructor(
      * Audio / Music / SFX lane). Operates on `project.audioClips` and
      * persists via saveProjectMeta so it survives reopen.
      */
+    /**
+     * Volume of a selected **audio object** (Video Audio / Music / SFX).
+     *
+     * 2026-10-30 — for the paired "Video Audio" object this used to write
+     * only `project.audioClips`, i.e. the tile. The preview mixer
+     * (`EditorScreen`'s `AudioMixerPlayer.update`) and the export
+     * (`RenderSegment.volume`, baked by `VolumeScalingAudioProcessor`)
+     * both read `VideoClip.volume`, so dragging that slider changed the
+     * tile and **nothing else** — no preview change, no change in the
+     * exported file. Silent in both directions, which is why it survived.
+     *
+     * The write-through is [PairedAudio.volumeForVideo]: paired objects
+     * forward to their clip, standalone ones (music, sfx) do not.
+     */
     fun updateAudioClipVolume(audioClipId: String, volume: Float) {
         historyDelegate.push()
+        var videoTouched = false
         _uiState.update { state ->
             val project = state.project ?: return@update state
-            state.copy(
-                project = project.copy(
-                    audioClips = project.audioClips.map { clip ->
-                        if (clip.id == audioClipId)
-                            clip.copy(volume = volume.coerceIn(0f, 2f), muted = false)
-                        else clip
-                    }
-                )
-            )
+            val audioClips = project.audioClips.map { clip ->
+                if (clip.id == audioClipId) {
+                    clip.copy(volume = volume.coerceIn(0f, 2f), muted = false)
+                } else {
+                    clip
+                }
+            }
+            val target = audioClips.firstOrNull { it.id == audioClipId }
+                ?: return@update state
+            val writeThrough = PairedAudio.volumeForVideo(target)
+            val clips = if (writeThrough == null) {
+                project.clips
+            } else {
+                videoTouched = true
+                project.clips.map { video ->
+                    if (video.id == target.originVideoClipId) video.copy(volume = writeThrough)
+                    else video
+                }
+            }
+            state.copy(project = project.copy(clips = clips, audioClips = audioClips))
         }
+        if (videoTouched) persistClips()
         persistProjectMeta()
     }
 
-    /** Mute / unmute a selected AUDIO object. */
+    /** Mute / unmute a selected AUDIO object. Paired objects forward to their clip. */
     fun updateAudioClipMute(audioClipId: String, muted: Boolean) {
         historyDelegate.push()
+        var videoTouched = false
         _uiState.update { state ->
             val project = state.project ?: return@update state
-            state.copy(
-                project = project.copy(
-                    audioClips = project.audioClips.map { clip ->
-                        if (clip.id == audioClipId) clip.copy(muted = muted) else clip
-                    }
-                )
-            )
+            val audioClips = project.audioClips.map { clip ->
+                if (clip.id == audioClipId) clip.copy(muted = muted) else clip
+            }
+            val target = audioClips.firstOrNull { it.id == audioClipId }
+                ?: return@update state
+            // Unmuting restores the remembered level rather than unity —
+            // the same reason `volumeForVideo` reads `muted` first.
+            val writeThrough = PairedAudio.volumeForVideo(target)
+            val clips = if (writeThrough == null) {
+                project.clips
+            } else {
+                videoTouched = true
+                project.clips.map { video ->
+                    if (video.id == target.originVideoClipId) video.copy(volume = writeThrough)
+                    else video
+                }
+            }
+            state.copy(project = project.copy(clips = clips, audioClips = audioClips))
         }
+        if (videoTouched) persistClips()
         persistProjectMeta()
     }
 
@@ -4106,15 +4174,29 @@ class EditorViewModel @Inject constructor(
      */
     fun setClipSpeed(clipId: String, speed: Float) {
         historyDelegate.push()
+        var audioTouched = false
         _uiState.update { state ->
             val project = state.project ?: return@update state
             val clipped = PlaybackSpeedRange.clamp(speed)
+            var changed: VideoClip? = null
             val clips = project.clips.map { clip ->
-                if (clip.id == clipId) clip.copy(speed = clipped) else clip
+                if (clip.id != clipId) return@map clip
+                clip.copy(speed = clipped).also { changed = it }
             }
-            state.copy(project = project.copy(clips = clips))
+            val next = changed ?: return@update state
+            // Paired-audio invariant (2026-10-30): speed changes how long
+            // the clip PLAYS, and the tile has to follow the same rule as
+            // the clip it mirrors. `mirrorGeometry` is the single place
+            // that decision lives.
+            val audioClips = project.audioClips.map { audio ->
+                if (audio.originVideoClipId != clipId) return@map audio
+                audioTouched = true
+                PairedAudio.mirrorGeometry(audio, next)
+            }
+            state.copy(project = project.copy(clips = clips, audioClips = audioClips))
         }
         persistClips()
+        if (audioTouched) persistProjectMeta()
     }
 
     // ====================================================================
