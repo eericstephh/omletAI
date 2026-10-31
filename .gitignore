@@ -57,3 +57,10 @@ app/ai-models/**/*.onnx
 app/ai-models/**/*.tflite
 app/ai-models/**/*.task
 app/ai-models/**/*.gguf
+
+# Device-test evidence and dex/APK archaeology. Large, machine-specific, and
+# regenerable: `.dexwork` alone is a 200 MB `dexdump` of the shipped APK, and
+# `.device-test` holds pulled exports, 900k-line logcat dumps and screenshots.
+# Keeping them out of history is deliberate — they were never source.
+.dexwork/
+.device-test/
