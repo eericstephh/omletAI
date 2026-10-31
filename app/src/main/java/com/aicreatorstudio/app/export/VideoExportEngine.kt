@@ -15,6 +15,7 @@ import androidx.media3.common.audio.BaseAudioProcessor
 import androidx.media3.common.audio.SonicAudioProcessor
 import androidx.media3.common.audio.SpeedChangingAudioProcessor
 import androidx.media3.common.audio.SpeedProvider
+import androidx.media3.common.audio.ToInt16PcmAudioProcessor
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.Presentation
 import androidx.media3.effect.ScaleAndRotateTransformation
@@ -1556,6 +1557,41 @@ class Media3TransformerExportEngine @Inject constructor(
      */
     private fun buildAudioProcessors(segment: RenderSegment): List<AudioProcessor> {
         val processors = mutableListOf<AudioProcessor>()
+
+        // 2026-10-31 — the chain must start with a 16-bit converter
+        // whenever a Sonic stage is present.
+        //
+        // `SonicAudioProcessor.configure` throws
+        // `UnhandledAudioFormatException` for anything but
+        // `ENCODING_PCM_16BIT` (verified with `javap` on
+        // media3-common 1.5.0: the only accepted constant is 2), while
+        // Media3's `AudioGraph` hands each item's chain the format it
+        // mixes in — **float** — as soon as the composition has more
+        // than one audio sequence. So a clip exported at 1× succeeded
+        // (no Sonic in the chain) and the very same clip at 2× died at
+        // TRANSFORMER with
+        //
+        //   Audio error: Error while registering input 0,
+        //   audioFormat=[sampleRate=44100, channelCount=2, encoding=4]
+        //
+        // `ToInt16PcmAudioProcessor` (also in media3-common) accepts
+        // both float and 16-bit and converts the former, so it is a
+        // pass-through on the path that already worked.
+        //
+        // It goes **first**, ahead of `VolumeScalingAudioProcessor` and
+        // the voice stage, because those read `ShortArray` too — they
+        // were quietly reading a float buffer as shorts on the same
+        // path, which is why this is a correctness fix and not only a
+        // crash fix.
+        val curveProvider = segment.buildSpeedProvider(sourceDurationUs = segment.sourceDurationMs * 1_000L)
+        val needsPitchStage = !segment.voiceEffect.isIdentity &&
+            VoiceEffects.needsPitchStage(segment.voiceEffect)
+        val needsSonic = needsPitchStage || curveProvider != null ||
+            (segment.speed != 1f && segment.speed > 0f)
+        if (needsSonic) {
+            processors += ToInt16PcmAudioProcessor()
+        }
+
         if (segment.volume != 1f) {
             processors += VolumeScalingAudioProcessor(segment.volume.coerceIn(0f, 1f))
         }
@@ -1585,7 +1621,7 @@ class Media3TransformerExportEngine @Inject constructor(
         // untouched project's exported audio byte-identical.
         if (!segment.voiceEffect.isIdentity) {
             VoiceEffectAudioProcessor.build(segment.voiceEffect)?.let { processors += it }
-            if (VoiceEffects.needsPitchStage(segment.voiceEffect)) {
+            if (needsPitchStage) {
                 processors += SonicAudioProcessor().apply {
                     setPitch(VoiceEffects.clampPitch(segment.voiceEffect.pitchFactor))
                 }
@@ -1606,7 +1642,6 @@ class Media3TransformerExportEngine @Inject constructor(
         // above is a separate, explicit shift, and the speed stage's own
         // pitch preservation is untouched. A clip can be at 2× with a
         // ramped curve and a chipmunk voice, and all three compose.
-        val curveProvider = segment.buildSpeedProvider(sourceDurationUs = segment.sourceDurationMs * 1_000L)
         if (curveProvider != null) {
             processors += SpeedChangingAudioProcessor(curveProvider)
         } else if (segment.speed != 1f && segment.speed > 0f) {
