@@ -2,6 +2,11 @@
 
 `com.aicreatorstudio.app` · src root `app/src/main/java/com/aicreatorstudio/app/`
 
+**Remote (since 2026-10-31):** `origin` = https://github.com/eericstephh/omletAI (public, default
+branch `master`). Auth comes from Windows Credential Manager (`credential.helper=manager`); `gh` is
+**not** logged in, so use `git push` and the REST API with the stored token, not `gh`. `.device-test/`
+and `.dexwork/` are ignored — earlier commits still carry them, history was deliberately not rewritten.
+
 **Load the narrowest source first.** Export/effect → `reference/architecture.md`; shipped features →
 `reference/features.md`; AI frames/decoder/Whisper → `reference/ai-media-decode.md`; Media3 →
 `media3-export-parity` skill; Atlas maps → `aierix-cut-project` skill; history → `.memory/2026-*.md`.
