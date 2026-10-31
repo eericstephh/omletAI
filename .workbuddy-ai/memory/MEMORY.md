@@ -54,8 +54,17 @@ obfuscated even when the class is kept.
 - ⚠️ **Stale closures in long-lived `DisposableEffect`s** are the most-repeated bug class (a 33 ms
   poller read a captured `isPlaying` and hard-paused playback). Read via
   `rememberUpdatedState(...).value`; a state the effect must *write* needs `by remember { mutableStateOf }`.
-- ⚠️ **Media3 audio lanes are 16-bit, always** — `SonicAudioProcessor.configure` throws on
-  non-`PCM_16BIT`, and converters sit at the pipeline **head only**. `javap -c` the shipped class.
+- ⚠️ **A processor must DECLARE the format it actually emits.** `AudioProcessingPipeline.configure`
+  chains each processor's *returned* format into the next and only advances when `isActive()`.
+  `VolumeScalingAudioProcessor`/`FadeAudioProcessor` read `asFloatBuffer` and hard-code
+  `ENCODING_PCM_FLOAT`, so they are float-only: a 16-bit converter placed *ahead* of them is
+  undone, and the Sonic stage behind dies with `UnhandledAudioFormatException` (`encoding=4`).
+  Correct shape: float stages → `ToInt16` → Sonic stages → (`ToFloat` → float stages) →
+  **`ToInt16` last, always** (Media3 takes the mixer format from input 0 and appends 16-bit-only
+  Sonic/ChannelMixing to every later input). `ToFloatPcmAudioProcessor` is hand-written —
+  media3-common 1.5.0 has no float counterpart. `AudioChainFormatTest` pins the order.
+  ⚠️ Still open: at speed ≠ 1 the exported **audio track is exactly half the video duration**
+  (constant ×2, not speed²) — see `.memory/2026-10-31.md` for the measurements.
 - ⚠️ **MediaPipe JNI**: `tasks-vision` ships no `.so`; the only lib is `tasks-core`'s
   `libmediapipe_tasks_jni.so`, shared by both engines via `ai/MediaPipeNativeLib.kt`.
 - ⚠️ **`AiToolRegistry` resolves engines from the Hilt `List<AiToolEngine>`** in
