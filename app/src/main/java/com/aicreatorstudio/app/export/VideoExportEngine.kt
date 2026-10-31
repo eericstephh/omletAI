@@ -103,6 +103,18 @@ internal object ExportDiagnostics {
         sink = log
     }
 
+    /**
+     * 2026-10-31 — app context for [persistFailure]'s external-files
+     * write. Wired from the engine's `init`, so it is set the first time
+     * the engine is constructed and stays for the process lifetime.
+     */
+    @Volatile
+    private var appContext: android.content.Context? = null
+
+    fun attachContext(context: android.content.Context?) {
+        appContext = context?.applicationContext
+    }
+
     /** Marks the beginning of an export run. */
     fun begin(segments: Int, audioSegments: Int, durationMs: Long) {
         val now = System.currentTimeMillis()
@@ -142,6 +154,130 @@ internal object ExportDiagnostics {
     fun warn(message: String) {
         android.util.Log.w(TAG, "export +${elapsedMs()}ms: $message")
         sink?.warn(COMPONENT, "export_warning", message, correlationId = runId.get())
+    }
+
+    /**
+     * 2026-10-31 — a **terminal** export failure, with its stack.
+     *
+     * Why this is not [warn]: on 2026-10-31 a device export died at
+     * TRANSFORMER with `UnhandledAudioFormatException ... encoding=4`,
+     * and logcat held nothing but `transformer error: TRANSFORMER
+     * bytes=0`. `ExportErrorDetail.describe` renders the cause
+     * *messages* into the dialog, but a message is not a stack — it
+     * cannot say which class threw, and `UnhandledAudioFormatException`
+     * carries no frames of its own because Media3 rethrows it as an
+     * `ExportException` cause.
+     *
+     * The release build is the only place this class of bug reproduces
+     * (the path needs a real MediaCodec and a real muxer), so the stack
+     * has to survive into logcat. `Log.e` is used directly rather than
+     * through the facade because the facade's release policy is WARN+
+     * *and* its store write is asynchronous — a process death would
+     * lose it.
+     */
+    fun fail(message: String, throwable: Throwable? = null) {
+        android.util.Log.e(TAG, "export +${elapsedMs()}ms: $message", throwable)
+        sink?.error(
+            COMPONENT, "export_failed", message,
+            correlationId = runId.get(), throwable = throwable
+        )
+        persistFailure(message, throwable)
+    }
+
+    /**
+     * Writes the last terminal failure to
+     * `<external files>/export-failure.txt`, overwriting the previous one.
+     *
+     * This exists because logcat is not a dependable channel for a
+     * shipped build on every OEM: MIUI drops the app's own log lines
+     * entirely, which made the 2026-10-31 `encoding=4` failure
+     * undiagnosable from the outside. The file is app-private external
+     * storage, so `adb pull` reads it without root or a debuggable
+     * build, and it holds nothing but the export's own error text.
+     *
+     * Best-effort by design: a diagnostics write must never turn into a
+     * second failure, so everything is wrapped and swallowed.
+     */
+    private fun persistFailure(message: String, throwable: Throwable?) {
+        val detail = if (throwable == null) "(no throwable)" else ExportErrorDetail.describe(throwable)
+        val stack = throwable?.stackTraceToString() ?: "(no throwable)"
+        val body = buildString {
+            append("time=").append(java.util.Date()).append('\n')
+            append("message=").append(message).append('\n')
+            append("cause-chain=").append(detail).append('\n')
+            append("audio-chains:").append('\n')
+            chainLog.forEach { append("  ").append(it).append('\n') }
+            append('\n').append(stack)
+        }
+        writeReport("export-failure.txt", body)
+    }
+
+    /**
+     * Every audio processor chain [buildAudioProcessors] produced this
+     * run, in build order, with the segment values that gated it.
+     *
+     * This exists because the 2026-10-31 `encoding=4` failure could not
+     * be settled from the outside: the source plainly puts a 16-bit
+     * converter at the head of the chain, the shipped dex plainly
+     * instantiates it, and yet Media3 still reported a float format
+     * reaching a processor that rejects it. Recording what was actually
+     * built turns that question into a fact in the report instead of an
+     * inference from bytecode.
+     */
+    private val chainLog =
+        java.util.Collections.synchronizedList(mutableListOf<String>())
+
+    fun noteChain(line: String) {
+        if (chainLog.size < 64) chainLog.add(line)
+    }
+
+    /**
+     * Writes a diagnostics file somewhere `adb` can actually read it.
+     *
+     * Two locations, because neither alone is dependable:
+     *
+     *  * `getExternalFilesDir(null)` — the documented app-private path,
+     *    and the natural home for this. On the MIUI device that
+     *    reproduced the 2026-10-31 failure the directory does not exist
+     *    at all and `getExternalFilesDir` returns a path the app cannot
+     *    create, so the write silently did nothing.
+     *  * `MediaStore.Downloads` — the only user-visible location a
+     *    release build may write without any permission on API 29+, and
+     *    therefore the only one `adb pull` can read without root or a
+     *    debuggable build. `Android/data` is off limits to the shell on
+     *    Android 11+ anyway.
+     *
+     * Best-effort throughout: a diagnostics write must never become a
+     * second failure.
+     */
+    private fun writeReport(name: String, body: String) {
+        val ctx = appContext ?: return
+        runCatching {
+            val dir = ctx.getExternalFilesDir(null) ?: return@runCatching
+            if (!dir.exists()) dir.mkdirs()
+            java.io.File(dir, name).writeText(body)
+        }
+        runCatching {
+            if (android.os.Build.VERSION.SDK_INT < 29) return@runCatching
+            val resolver = ctx.contentResolver
+            val collection = android.provider.MediaStore.Downloads.EXTERNAL_CONTENT_URI
+            // Overwrite rather than accumulate one copy per failed run.
+            resolver.delete(
+                collection,
+                "${android.provider.MediaStore.MediaColumns.DISPLAY_NAME}=?",
+                arrayOf(name)
+            )
+            val values = android.content.ContentValues().apply {
+                put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, name)
+                put(android.provider.MediaStore.MediaColumns.MIME_TYPE, "text/plain")
+                put(
+                    android.provider.MediaStore.MediaColumns.RELATIVE_PATH,
+                    android.os.Environment.DIRECTORY_DOWNLOADS
+                )
+            }
+            val uri = resolver.insert(collection, values) ?: return@runCatching
+            resolver.openOutputStream(uri)?.use { it.write(body.toByteArray()) }
+        }
     }
 
     /**
@@ -389,6 +525,15 @@ class Media3TransformerExportEngine @Inject constructor(
     @ApplicationContext private val context: Context,
     private val aiHooks: AiExportHooks
 ) : VideoExportEngine {
+
+    init {
+        // 2026-10-31 — the failure report needs somewhere to land that
+        // does not depend on logcat. On MIUI the app's own log lines do
+        // not reach `adb logcat` at all (verified: zero lines from the
+        // app's pid across a 378 k-line dump that covered a full export
+        // run), so a release-build crash report was unreachable.
+        ExportDiagnostics.attachContext(context)
+    }
 
     private val activeState = MutableStateFlow<ExportState>(ExportState.Idle)
 
@@ -722,6 +867,7 @@ class Media3TransformerExportEngine @Inject constructor(
                             } catch (t: Throwable) {
                                 target.cleanupOnFailure()
                                 scope.launch { aiHooks.cleanup() }
+                                ExportDiagnostics.fail("finalizing failed", t)
                                 emitTerminal(
                                     ExportState.Failed(
                                         ExportErrorDetail.describe(t, "FINALIZING")
@@ -739,9 +885,10 @@ class Media3TransformerExportEngine @Inject constructor(
                         activeTransformer.set(null)
                         target.cleanupOnFailure()
                         scope.launch { aiHooks.cleanup() }
-                        ExportDiagnostics.warn(
+                        ExportDiagnostics.fail(
                             "transformer error: ${exception.errorCodeName} " +
-                                "bytes=${result.fileSizeBytes}"
+                                "bytes=${result.fileSizeBytes}",
+                            exception
                         )
                         emitTerminal(
                             ExportState.Failed(
@@ -1544,90 +1691,54 @@ class Media3TransformerExportEngine @Inject constructor(
      *   using [com.aicreatorstudio.app.model.AudioFade] — the same curve
      *   the live preview applies.
      *
-     * All three operate on float PCM; Media3 does the format plumbing. The
-     * identity cases are skipped because the processors are no-ops then —
-     * purely an optimisation, and the reason an untouched project exports
-     * byte-identically.
+     * **The PCM encoding is not free, and the shape of this chain is
+     * forced by it.** Three facts pin it down:
      *
-     * **Order matters for the fade:** it is appended LAST so it sees
-     * post-speed audio. The clip-local clock it counts is then in output
-     * time, which is what the user set the fade length against, and it
-     * lines up with [RenderSegment.outputDurationMs]. The volume and speed
-     * processors are time-invariant, so their position is free.
+     *  1. The decoder hands the chain **float** PCM (`encoding = 4`).
+     *  2. [VolumeScalingAudioProcessor] and [FadeAudioProcessor] are
+     *     float-only. They read the buffer with `asFloatBuffer()` and
+     *     *declare* `ENCODING_PCM_FLOAT` from `onConfigure`. They can
+     *     neither be fed 16-bit nor be moved across a stage that changes
+     *     the encoding, because their declared output would be a lie.
+     *  3. Every Sonic stage accepts **only** `ENCODING_PCM_16BIT` and
+     *     throws `UnhandledAudioFormatException` otherwise. That covers
+     *     `SonicAudioProcessor`, `SpeedChangingAudioProcessor`, and the
+     *     `SonicAudioProcessor` / `ChannelMixingAudioProcessor` that
+     *     Media3 itself appends to every input after the first.
+     *
+     * So: run the float stages first, convert to 16-bit once, run every
+     * Sonic stage, convert back to float if the fade still has to run,
+     * and **always end in 16-bit**.
+     *
+     * That last rule is the easy one to miss. Media3 takes the *mixer*
+     * format from the **first** registered input's output and then
+     * requires every later input to match it. A chain ending in float
+     * makes the mixer float, and the Sonic stage Media3 appends to input
+     * 1 then rejects it. Ending every chain in 16-bit is what makes the
+     * whole composition agree.
+     *
+     * **Order matters for the fade:** it stays last among the *effects*
+     * so it sees post-speed audio. The clip-local clock it counts is
+     * then in output time, which is what the user set the fade length
+     * against, and it lines up with [RenderSegment.outputDurationMs].
+     * The volume processor is time-invariant, so its position is free.
+     *
+     * 2026-10-31 — this shape replaces one that put the 16-bit converter
+     * at the **head** and left the float processors behind it. That
+     * could not work: the converter produced 16-bit, then
+     * [VolumeScalingAudioProcessor] declared float again, and the Sonic
+     * stage after it died on a float buffer. The device report
+     * (`export-failure.txt`) recorded the chain as
+     * `ToInt16PcmAudioProcessor,VolumeScalingAudioProcessor,SpeedChangingAudioProcessor`
+     * with the throw inside `SonicAudioProcessor.configure`.
      */
     private fun buildAudioProcessors(segment: RenderSegment): List<AudioProcessor> {
         val processors = mutableListOf<AudioProcessor>()
 
-        // 2026-10-31 — the chain must start with a 16-bit converter
-        // whenever a Sonic stage is present.
-        //
-        // `SonicAudioProcessor.configure` throws
-        // `UnhandledAudioFormatException` for anything but
-        // `ENCODING_PCM_16BIT` (verified with `javap` on
-        // media3-common 1.5.0: the only accepted constant is 2), while
-        // Media3's `AudioGraph` hands each item's chain the format it
-        // mixes in — **float** — as soon as the composition has more
-        // than one audio sequence. So a clip exported at 1× succeeded
-        // (no Sonic in the chain) and the very same clip at 2× died at
-        // TRANSFORMER with
-        //
-        //   Audio error: Error while registering input 0,
-        //   audioFormat=[sampleRate=44100, channelCount=2, encoding=4]
-        //
-        // `ToInt16PcmAudioProcessor` (also in media3-common) accepts
-        // both float and 16-bit and converts the former, so it is a
-        // pass-through on the path that already worked.
-        //
-        // It goes **first**, ahead of `VolumeScalingAudioProcessor` and
-        // the voice stage, because those read `ShortArray` too — they
-        // were quietly reading a float buffer as shorts on the same
-        // path, which is why this is a correctness fix and not only a
-        // crash fix.
-        val curveProvider = segment.buildSpeedProvider(sourceDurationUs = segment.sourceDurationMs * 1_000L)
+        val curveProvider =
+            segment.buildSpeedProvider(sourceDurationUs = segment.sourceDurationMs * 1_000L)
         val needsPitchStage = !segment.voiceEffect.isIdentity &&
             VoiceEffects.needsPitchStage(segment.voiceEffect)
-        val needsSonic = needsPitchStage || curveProvider != null ||
-            (segment.speed != 1f && segment.speed > 0f)
-        if (needsSonic) {
-            processors += ToInt16PcmAudioProcessor()
-        }
-
-        if (segment.volume != 1f) {
-            processors += VolumeScalingAudioProcessor(segment.volume.coerceIn(0f, 1f))
-        }
-
-        // ---- 2026-10-13 Voice Changer ----
-        //
-        // Placed BEFORE the speed stage, which is the only order that
-        // matches the live preview. There, a custom `AudioProcessor` runs
-        // ahead of the sink's own Sonic stage (Media3 builds
-        // `DefaultAudioProcessorChain` as `[custom..., silenceSkip, sonic]`),
-        // so the voice transformation always sees source-rate audio and
-        // the rate change is applied on top of its result. Putting these
-        // after `SpeedChangingAudioProcessor` would make an echo tail a
-        // different length in the exported file than in the preview —
-        // and only for clips that are also speed-ramped, which is the
-        // hardest possible version of that bug to notice.
-        //
-        // Two processors, because they do two different jobs:
-        //  * `VoiceEffectAudioProcessor` runs the timbre stages (ring
-        //    modulation / band-pass / echo) from the shared `VoiceEffectDsp`;
-        //  * `SonicAudioProcessor` shifts pitch without changing duration.
-        //    It is the same algorithm the preview's `PlaybackParameters`
-        //    pitch goes through, so the two renderers agree on what
-        //    "1.6× higher" sounds like.
-        //
-        // Both are skipped entirely for `NONE`, which is what keeps an
-        // untouched project's exported audio byte-identical.
-        if (!segment.voiceEffect.isIdentity) {
-            VoiceEffectAudioProcessor.build(segment.voiceEffect)?.let { processors += it }
-            if (needsPitchStage) {
-                processors += SonicAudioProcessor().apply {
-                    setPitch(VoiceEffects.clampPitch(segment.voiceEffect.pitchFactor))
-                }
-            }
-        }
-
         // 2026-09-29 — the curve path reuses this exact processor. There
         // is no separate "ramp audio" implementation to keep in sync:
         // `SpeedChangingAudioProcessor` already consumes a
@@ -1636,24 +1747,88 @@ class Media3TransformerExportEngine @Inject constructor(
         // `SpeedCurve.preservePitch` assumes). Handing it the same
         // provider the video effect got is what makes the two stay
         // locked — a curve evaluated twice could drift.
-        //
-        // 2026-10-13 — note that this is also what keeps the voice
-        // changer from *breaking* pitch preservation: the pitch stage
-        // above is a separate, explicit shift, and the speed stage's own
-        // pitch preservation is untouched. A clip can be at 2× with a
-        // ramped curve and a chipmunk voice, and all three compose.
-        if (curveProvider != null) {
-            processors += SpeedChangingAudioProcessor(curveProvider)
-        } else if (segment.speed != 1f && segment.speed > 0f) {
-            processors += SpeedChangingAudioProcessor(ConstantSpeedProvider(segment.speed))
+        val speedStage: AudioProcessor? = when {
+            curveProvider != null -> SpeedChangingAudioProcessor(curveProvider)
+            segment.speed != 1f && segment.speed > 0f ->
+                SpeedChangingAudioProcessor(ConstantSpeedProvider(segment.speed))
+            else -> null
         }
-        if (!AudioFade.isIdentity(segment.fadeInMs, segment.fadeOutMs)) {
+        val hasSonic = needsPitchStage || speedStage != null
+        val hasFade = !AudioFade.isIdentity(segment.fadeInMs, segment.fadeOutMs)
+
+        // ---- float stages, in source order ----
+        if (segment.volume != 1f) {
+            processors += VolumeScalingAudioProcessor(segment.volume.coerceIn(0f, 1f))
+        }
+
+        // ---- 2026-10-13 Voice Changer ----
+        //
+        // The timbre stage runs BEFORE the pitch shift, which is the only
+        // order that matches the live preview. There, a custom
+        // `AudioProcessor` runs ahead of the sink's own Sonic stage
+        // (Media3 builds `DefaultAudioProcessorChain` as
+        // `[custom..., silenceSkip, sonic]`), so the voice transformation
+        // always sees source-rate audio and the rate change is applied on
+        // top of its result. Putting it after the Sonic stages would make
+        // an echo tail a different length in the exported file than in
+        // the preview — and only for clips that are also speed-ramped,
+        // which is the hardest possible version of that bug to notice.
+        //
+        // `VoiceEffectAudioProcessor` is float-only like the volume and
+        // fade stages, so it belongs on this side of the converter. The
+        // pitch shift is a Sonic stage, so it belongs on the other side.
+        if (!segment.voiceEffect.isIdentity) {
+            VoiceEffectAudioProcessor.build(segment.voiceEffect)?.let { processors += it }
+        }
+
+        // ---- Sonic stages: 16-bit in, 16-bit out ----
+        if (hasSonic) {
+            processors += ToInt16PcmAudioProcessor()
+            if (needsPitchStage) {
+                // `SonicAudioProcessor` shifts pitch without changing
+                // duration. It is the same algorithm the preview's
+                // `PlaybackParameters` pitch goes through, so the two
+                // renderers agree on what "1.6× higher" sounds like.
+                //
+                // 2026-10-13 — this is also what keeps the voice changer
+                // from *breaking* pitch preservation: the pitch shift is
+                // a separate, explicit stage, and the speed stage's own
+                // pitch preservation is untouched. A clip can be at 2×
+                // with a ramped curve and a chipmunk voice, and all three
+                // compose.
+                processors += SonicAudioProcessor().apply {
+                    setPitch(VoiceEffects.clampPitch(segment.voiceEffect.pitchFactor))
+                }
+            }
+            speedStage?.let { processors += it }
+            // Hand the fade the float PCM it requires.
+            if (hasFade) processors += ToFloatPcmAudioProcessor()
+        }
+
+        if (hasFade) {
             processors += FadeAudioProcessor(
                 fadeInMs = segment.fadeInMs,
                 fadeOutMs = segment.fadeOutMs,
                 clipDurationMs = segment.outputDurationMs
             )
         }
+
+        // ---- always end in 16-bit (see the KDoc) ----
+        // A no-op when the chain already ends 16-bit: the converter
+        // returns `AudioFormat.NOT_SET` for 16-bit input, which makes it
+        // inactive and leaves the pipeline's format untouched.
+        processors += ToInt16PcmAudioProcessor()
+        // 2026-10-31 — record the chain that will actually reach Media3.
+        // The failure report is the only channel that survives a shipped
+        // build on this device, so "was the converter really in there?"
+        // has to be answerable from the file rather than from the source.
+        ExportDiagnostics.noteChain(
+            "clip=${segment.sourceUri.substringAfterLast('/')} speed=${segment.speed} " +
+                "curve=${curveProvider != null} volume=${segment.volume} " +
+                "voiceIdentity=${segment.voiceEffect.isIdentity} " +
+                "fade=${segment.fadeInMs}/${segment.fadeOutMs} -> " +
+                processors.joinToString(",") { it.javaClass.simpleName }
+        )
         return processors
     }
 
@@ -1849,14 +2024,71 @@ private class ConstantSpeedProvider(private val speed: Float) : SpeedProvider {
 }
 
 /**
+ * Converts 16-bit signed integer PCM back to 32-bit float.
+ *
+ * The mirror of Media3's `ToInt16PcmAudioProcessor`, which ships in
+ * media3-common 1.5.0 but has no float counterpart there (checked with
+ * `ls` on the AAR — only `ToInt16PcmAudioProcessor` exists).
+ *
+ * It exists because the Sonic stages have to be bracketed. Every Sonic
+ * stage — `SonicAudioProcessor`, `SpeedChangingAudioProcessor` — accepts
+ * only `ENCODING_PCM_16BIT`, while [VolumeScalingAudioProcessor] and
+ * [FadeAudioProcessor] are float-only. A chain that needs both therefore
+ * has to go float -> 16-bit -> Sonic -> float, and this is the way back.
+ *
+ * Follows `ToInt16PcmAudioProcessor`'s contract exactly: when the input
+ * is *already* float it returns `AudioFormat.NOT_SET`, which makes the
+ * processor inactive and the pipeline a pass-through. That is what lets
+ * it be inserted unconditionally without disturbing a chain that never
+ * left float.
+ */
+@androidx.annotation.OptIn(UnstableApi::class)
+private class ToFloatPcmAudioProcessor : BaseAudioProcessor() {
+
+    override fun onConfigure(inputAudioFormat: AudioProcessor.AudioFormat):
+            AudioProcessor.AudioFormat = when (inputAudioFormat.encoding) {
+        C.ENCODING_PCM_FLOAT -> AudioProcessor.AudioFormat.NOT_SET
+        C.ENCODING_PCM_16BIT -> AudioProcessor.AudioFormat(
+            inputAudioFormat.sampleRate,
+            inputAudioFormat.channelCount,
+            C.ENCODING_PCM_FLOAT
+        )
+        else -> throw AudioProcessor.UnhandledAudioFormatException(inputAudioFormat)
+    }
+
+    override fun queueInput(inputBuffer: ByteBuffer) {
+        val remaining = inputBuffer.remaining()
+        if (remaining <= 0) return
+        val sampleCount = remaining / 2
+        val inView = inputBuffer.duplicate().order(ByteOrder.LITTLE_ENDIAN).asShortBuffer()
+        val outBuffer = replaceOutputBuffer(sampleCount * 4)
+        val outView = outBuffer.order(ByteOrder.LITTLE_ENDIAN).asFloatBuffer()
+        for (i in 0 until sampleCount) {
+            // 32768f, not 32767f: the negative rail reaches -32768, so
+            // dividing by 32768 keeps the range symmetric and maps it to
+            // exactly [-1, 1) without clipping the trough.
+            outView.put(inView.get() / 32768f)
+        }
+        outBuffer.position(0)
+        outBuffer.limit(sampleCount * 4)
+        inputBuffer.position(inputBuffer.limit())
+    }
+}
+
+/**
  * Audio processor that multiplies every float PCM sample by a fixed
  * gain. Used to bake the per-clip volume (and the Mute toggle) into
  * the exported MP4.
  *
- * Operates on interleaved 32-bit float PCM in [-1, 1]. Media3 takes
- * care of converting from the source encoding (typically 16-bit
- * signed integer PCM at 44.1/48 kHz) via its built-in resamplers
- * and the encoder writes the result as AAC.
+ * Operates on interleaved 32-bit float PCM in [-1, 1], and **declares
+ * float as its output**. That declaration is load-bearing: the export
+ * pipeline chains each processor's output format into the next one, so
+ * a processor that reads float but claims 16-bit (or the reverse)
+ * corrupts the audio and can make the next stage reject the stream.
+ * The 2026-10-31 `encoding=4` export failure was exactly that — this
+ * class sat after a 16-bit converter and re-declared float, so the
+ * Sonic stage behind it died. See [buildAudioProcessors] for the
+ * ordering this forces.
  */
 @androidx.annotation.OptIn(UnstableApi::class)
 private class VolumeScalingAudioProcessor(
