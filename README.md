@@ -79,15 +79,73 @@ cd omletAI
 
 # Omelet AI — AI Video Editing Studio (English)
 
-**Omelet AI (املت AI)** is a full video editor for Android with on-device AI tools built around a professional timeline. Fully Persian, right-to-left interface; most AI features run **offline on the device** — no video ever leaves your phone.
+**Omelet AI (املت AI)** is a complete video editor for Android that puts AI tools right next to a professional timeline, so editing, subtitling and enhancing videos becomes fast and simple. The interface is fully Persian and right-to-left, and most of its AI features run **offline, entirely on the device**.
 
-- **12 AI tools:** smart Persian subtitles (offline Whisper or cloud), AI subtitle correction, in-video OCR (fa/ar/en), smart highlights, background removal, auto-framing & reframe, motion tracking, 4× AI upscale (ESRGAN), voice clean & enhance, silence cutting, beat-sync editing
-- **Full editor:** multi-track timeline, text overlays, filters, transitions, speed control, independent audio lanes, export from 480p up to 4K with hardware acceleration
-- **Optional cloud:** bring your own Groq API key (stored encrypted in the Android Keystore) for cloud transcription — a step-by-step guide is built into the app
-- **Three dark themes**, interactive onboarding, in-app update notifications
+> This project was developed with the help of AI.
 
-**Download:** grab the latest APK from [Releases](https://github.com/eericstephh/omletAI/releases) (requires Android 7.0+).
+## Download
 
-**Build:** Android Studio, JDK 17, `./gradlew :app:assembleRelease` — Kotlin · Jetpack Compose · Hilt · Media3.
+Get the latest release (v1.1) from the [Releases](https://github.com/eericstephh/omletAI/releases) page:
 
-License: [MIT](LICENSE)
+| | |
+|---|---|
+| File | `AICreatorStudio-v1.1-release.apk` |
+| Android | 7.0 and up (API 24+) |
+| Size | ~95 MB |
+
+Install: open the APK; if you see an "install from unknown sources" prompt, allow installs for your browser or file manager.
+
+## AI features
+
+| Tool | What it does |
+|---|---|
+| Smart subtitles | Speech-to-text Persian subtitles — fully offline (Whisper) or cloud |
+| AI subtitle correction | Automatically fixes spelling and Persian-writing mistakes in subtitles |
+| Smart OCR | Extracts text shown inside the video frame (Persian, Arabic, English) |
+| Smart highlights | Auto-builds a short clip from the best moments of a video |
+| Background removal | Separates the subject from the background — no green screen needed |
+| Auto framing | Smart, automatic cropping of the video frame |
+| Smart reframe | Convert landscape to portrait (and back) while keeping the subject in frame |
+| Motion tracking | Follows a subject and attaches effects to its motion path |
+| AI upscale | Up to 4× resolution enhancement (ESRGAN) |
+| Voice clean | Removes background noise from speech |
+| Voice enhance | Clarifies and balances spoken audio |
+| Silence cut | Automatically removes silent segments |
+| Beat sync | Syncs cuts to the rhythm of the music |
+
+## Editor features
+
+- Multi-track timeline with live preview
+- Text & title overlays with custom fonts, filters and color effects
+- Transitions, speed control, trim and rotation
+- Independent audio lane, voice effects, pitch/speed changes
+- Export from 480p up to 4K (2160p) with hardware acceleration
+- Three color themes: Violet Night, Ocean, Crimson Sunset
+- Interactive onboarding tour + in-app update notifications
+
+## Offline & cloud AI
+
+- **Offline (default):** the Whisper, MediaPipe, ESRGAN and Tesseract models are downloaded and executed inside the app itself — no video is ever sent off the device for AI processing.
+- **Cloud (optional):** enter your own Groq API key in Settings to enable cloud transcription and AI subtitle correction. The key is stored encrypted (Android Keystore) on that device only. A step-by-step key setup guide is built into the app.
+
+## Build from source
+
+```bash
+git clone https://github.com/eericstephh/omletAI.git
+cd omletAI
+./gradlew :app:assembleRelease
+```
+
+- Android Studio (recent version) + JDK 17
+- compileSdk 35 / minSdk 24
+- Kotlin + Jetpack Compose + Hilt + Media3
+
+Run the tests:
+
+```bash
+./gradlew :app:testDebugUnitTest
+```
+
+## License
+
+[MIT](LICENSE)
