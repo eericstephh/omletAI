@@ -86,3 +86,7 @@ install-skills.ps1
 # Scratch AI experiments at the repo root
 hello_ort_gpu.py
 requirements.txt
+
+# Old agent-kit install notes — superseded by README.md
+README.txt
+README_FIX_NOTES.md
