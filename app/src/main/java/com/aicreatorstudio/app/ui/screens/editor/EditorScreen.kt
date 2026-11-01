@@ -238,7 +238,9 @@ private const val GRAIN_FRAME_MS = 33L
 
 // =================== Section height tokens ===================
 private val TopBarHeight = 56.dp
-private val PlaybackStripHeight = 56.dp
+// 2026-11-01 — internal (was private): the transport visuals moved to
+// EditorTransportBar.kt, which sizes its band with the same token.
+internal val PlaybackStripHeight = 56.dp
 // 2026-09-28 — the bottom dock is now the contextual single-row toolbar
 // (`ContextualToolbar`), which sizes to its content. The old two-row
 // category layout and its fixed height token are gone, along with
@@ -4803,90 +4805,22 @@ private fun EditorPlaybackStripSection(
     // byte-identical logic (`selectedClipId ?: activeClip` → `splitClip`),
     // putting the same action on screen twice whenever a clip was selected.
     // Split now belongs to the clip context, where it has a target by
-    // definition; the row keeps ⏪ ▶ ⏩, the scrubber and the timecodes.
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
-            .fillMaxWidth()
-            .height(PlaybackStripHeight)
-            .background(CinematicSurface)
-            .padding(horizontal = 12.dp)
-    ) {
-        // 2026-10-16 (Phase 2) — 40dp → 44dp: the transport's primary
-        // control sits under the comfortable-touch-target floor. Labels are
-        // Persian like the rest of the workspace chrome.
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(percent = 50))
-                .background(
-                    ctaBrush()
-                )
-                .clickable(role = Role.Button) { onPlayPause() },
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = if (isPlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                contentDescription = if (isPlaying) "توقف" else "پخش",
-                tint = LabelPrimary,
-                modifier = Modifier.size(22.dp)
-            )
-        }
-        Spacer(Modifier.width(10.dp))
-        Text(
-            text = EditorTimecode.mmSsMs(positionMs),
-            color = LabelPrimary,
-            style = MaterialTheme.typography.labelMedium,
-            fontWeight = FontWeight.SemiBold
-        )
-        Spacer(Modifier.width(8.dp))
-        // Live scrub: as the user drags the thumb we call
-        // [onScrubStart] once, [onScrubSeek] on every value change
-        // (millisecond-accurate) and [onScrubEnd] on release. The
-        // ViewModel mirrors the position into `pendingScrubSeekMs`
-        // which the screen forwards to ExoPlayer via
-        // `seekTo(ms, SEEK_PARAM_CLOSEST_SYNC)` for snappy scrubbing
-        // without stutter.
-        // Track whether the user is currently dragging so we can
-        // fire [onScrubStart] on the first value change and
-        // [onScrubEnd] in onValueChangeFinished. This Material3 Slider
-        // overload doesn't expose onValueChangeStarted, so we detect
-        // the gesture start inside the value lambda with a remember flag.
-        var scrubbing by remember { mutableStateOf(false) }
-        Slider(
-            value = positionMs.toFloat().coerceAtLeast(0f),
-            onValueChange = { v ->
-                if (!scrubbing) {
-                    scrubbing = true
-                    onScrubStart()
-                }
-                onScrubSeek(v.toLong())
-            },
-            onValueChangeFinished = {
-                if (scrubbing) {
-                    scrubbing = false
-                    onScrubEnd()
-                }
-            },
-            valueRange = 0f..durationMs.coerceAtLeast(1).toFloat(),
-            colors = SliderDefaults.colors(
-                thumbColor = accentBright(),
-                activeTrackColor = accentPrimary(),
-                // 2026-10-16 — was `Color.White.copy(0.10f)`, a raw literal
-                // that rendered the scrubber trough almost invisibly on the
-                // transport band. [BorderSubtle] is the token for a visible
-                // inactive track on a dark surface.
-                inactiveTrackColor = BorderSubtle
-            ),
-            modifier = Modifier.weight(1f)
-        )
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = EditorTimecode.mmSsMs(durationMs),
-            color = LabelSecondary,
-            style = MaterialTheme.typography.labelMedium
-        )
-    }
+    // definition; the row keeps ▶, the scrubber and the timecodes.
+    //
+    // 2026-11-01 — the visuals moved to [EditorTransportBar] (its own file,
+    // keeping THIS file's method budget clear of the 64 KB limit): a
+    // hand-drawn slim scrubber with a glowing thumb and an accent-gradient
+    // play circle with press-scale. The scrub contract below is unchanged —
+    // start / seek / end flow through the same throttled pipeline.
+    EditorTransportBar(
+        isPlaying = isPlaying,
+        positionMs = positionMs,
+        durationMs = durationMs,
+        onPlayPause = onPlayPause,
+        onScrubStart = onScrubStart,
+        onScrubSeek = onScrubSeek,
+        onScrubEnd = onScrubEnd
+    )
 }
 
 // ====================================================================
