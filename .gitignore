@@ -64,3 +64,25 @@ app/ai-models/**/*.gguf
 # Keeping them out of history is deliberate — they were never source.
 .dexwork/
 .device-test/
+
+# ── AI coding-assistant workspaces — local tooling only, never published ──
+# These hold agent configs, session memory and cloned agent/skill packages for
+# opencode / workbuddy / claude / kilo / zcode. Kept on the dev machine, kept
+# out of the repository (removed from the index on 2026-11-01 at the owner's
+# request; history before that commit still contains them).
+.opencode/
+.workbuddy-ai/
+.claude/
+.claude-shots/
+.kilo/
+.zcode/
+.zcodeignore
+AGENTS.md
+AIerix-Cut-Lead-Engineer-Agent/
+workbuddy-clone/
+start-dashboard.bat
+install-skills.ps1
+
+# Scratch AI experiments at the repo root
+hello_ort_gpu.py
+requirements.txt
