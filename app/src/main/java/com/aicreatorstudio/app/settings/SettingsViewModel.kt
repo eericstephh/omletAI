@@ -12,7 +12,7 @@ class SettingsViewModel @Inject constructor(
 
     val settings: StateFlow<AppSettings> = settingsRepository.settings
 
-    fun updateThemeMode(mode: ThemeMode) = settingsRepository.updateThemeMode(mode)
+    fun updateTheme(theme: AppTheme) = settingsRepository.updateTheme(theme)
     fun updateExportQuality(quality: String) = settingsRepository.updateExportQuality(quality)
     fun updateAutoSave(enabled: Boolean) = settingsRepository.updateAutoSave(enabled)
     fun updateSnapToGrid(enabled: Boolean) = settingsRepository.updateSnapToGrid(enabled)

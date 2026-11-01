@@ -79,8 +79,13 @@ android {
         // `data/AppChangelogProvider.kt` and its newest entry must carry the
         // SAME versionCode — `AppChangelogProviderTest` fails the build if the
         // two drift apart.
-        versionCode = 4
-        versionName = "1.4.0"
+        // 2026-11-01 — store release «1.1». versionCode is still the
+        // monotonic build number: the old 1.1.0–1.4.0 dev line shipped as
+        // codes 1–4, so this release MUST be 5 or the installed base
+        // (code 4) would refuse the update and the bell would never light
+        // up for it (`hasUnreadUpdates` compares codes, not names).
+        versionCode = 5
+        versionName = "1.1"
 
         // 2026-09-16 Tapsell Mediation — the SDK reads its app key from
         // the `ir.tapsell.mediation.APPLICATION_KEY` manifest meta-data

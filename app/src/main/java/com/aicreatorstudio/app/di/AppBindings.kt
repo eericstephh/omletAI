@@ -7,6 +7,8 @@ import com.aicreatorstudio.app.ai.NetworkClient
 import com.aicreatorstudio.app.ai.UnifiedModelInstaller
 import com.aicreatorstudio.app.data.AppUpdatePreferences
 import com.aicreatorstudio.app.data.DefaultAppUpdatePreferences
+import com.aicreatorstudio.app.data.DefaultTutorialPreferences
+import com.aicreatorstudio.app.data.TutorialPreferences
 import com.aicreatorstudio.app.data.font.CustomFontRepository
 import com.aicreatorstudio.app.data.font.DefaultCustomFontRepository
 import dagger.Binds
@@ -89,6 +91,22 @@ abstract class AppBindings {
     ): AppUpdatePreferences
 
     /**
+     * 2026-11-01 — the first-run tutorial's bookmark (onboarding content
+     * version + whether the Home tour has been seen).
+     *
+     * Bound as an interface for the same reason as
+     * [AppUpdatePreferences]: `TutorialViewModel` takes it as a
+     * constructor dependency and is constructed directly in a JVM test,
+     * where `SharedPreferences` is unavailable. Tests supply
+     * `InMemoryTutorialPreferences` instead of going through Hilt.
+     */
+    @Binds
+    @Singleton
+    abstract fun bindTutorialPreferences(
+        impl: DefaultTutorialPreferences
+    ): TutorialPreferences
+
+    /**
      * The user's imported fonts.
      *
      * Bound as an interface for the same reason as
@@ -104,4 +122,28 @@ abstract class AppBindings {
     abstract fun bindCustomFontRepository(
         impl: DefaultCustomFontRepository
     ): CustomFontRepository
+
+    /**
+     * 2026-11-01 — the AI subtitle-correction stage's two seams.
+     *
+     * Both are bound as interfaces for the reason above: the real
+     * implementations need a `Context` (Keystore, SharedPreferences)
+     * and a live socket, so a concrete dependency would make
+     * `PersianSubtitleCorrector` unconstructible in a JVM test. The
+     * tests supply a fake client and fake credentials instead of going
+     * through Hilt, which is what lets rate limits, timeouts,
+     * cancellation and malformed replies be asserted **without a paid
+     * API call**.
+     */
+    @Binds
+    @Singleton
+    abstract fun bindChatCompletionClient(
+        impl: com.aicreatorstudio.app.ai.groq.GroqChatClient
+    ): com.aicreatorstudio.app.ai.subtitle.correction.ChatCompletionClient
+
+    @Binds
+    @Singleton
+    abstract fun bindCorrectionCredentials(
+        impl: com.aicreatorstudio.app.ai.subtitle.correction.DefaultCorrectionCredentials
+    ): com.aicreatorstudio.app.ai.subtitle.correction.CorrectionCredentials
 }

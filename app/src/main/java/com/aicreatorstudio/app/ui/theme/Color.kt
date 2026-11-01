@@ -1,12 +1,23 @@
 package com.aicreatorstudio.app.ui.theme
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 
 // --- CTA gradient: the ONLY gradient allowed under white text ---
-// White passes AA at both ends (5.70 / 7.10). Never put white text on
-// AccentBright (#A78BFA, 2.72:1) — use it for text/icons on dark instead.
-fun ctaBrush(): Brush = Brush.verticalGradient(listOf(AccentDeep, AccentCtaBottom))
+// White passes AA at both ends of every theme's deep→ctaBottom pair (violet
+// 5.70 / 7.10, ocean 5.9 / 7.8, rose 5.0 / 6.6). Never put white text on
+// accentBright() (#A78BFA in the violet theme, 2.72:1) — use it for
+// text/icons on dark instead.
+//
+// 2026-11-01 — themable. Reads the active AccentColors via
+// [LocalAccentColors] so every existing call site follows the user's chosen
+// theme with no change of its own. This MUST stay a @Composable: it is the
+// one token whose value legitimately changes at runtime.
+@Composable
+fun ctaBrush(): Brush = with(LocalAccentColors.current) {
+    Brush.verticalGradient(listOf(deep, ctaBottom))
+}
 
 // ============================================================================
 // "Dark Studio" — Omelet design tokens (2026-10 refinement).
@@ -168,6 +179,39 @@ val iOSLightSurfaceHigh   = Color(0xFFEFF1F5)
 val iOSLightLabelPrimary  = Color(0xFF0F172A)
 val iOSLightLabelSecondary = Color(0x990F172A)
 val iOSLightLabelTertiary = Color(0x4D0F172A)
+
+// ============================================================================
+// "Dark Studio 2" card system (2026-11 home refresh).
+//
+// The 2026-10 ladder (Surface → Elevated → Highest) was built for PANELS that
+// must sit on top of each other, and home cards were reusing its bottom rung
+// (`CinematicSurface`) — so every card read at the same value as the chrome
+// around it and the screen went flat. These two values are the CARD rungs:
+// slightly cooler and deliberately distinct from the panel ladder, so a card
+// separates from the backdrop by value AND by edge treatment rather than by
+// a 1dp grey line alone.
+//
+// The edge is a vertical gradient (brighter at the top, vanishing at the
+// bottom) — the standard dark-UI depth cue: light appears to fall from
+// above, so the top edge catches it. `cardEdgeBrush()` is the ONLY way to
+// draw these edges; a flat `BorderSubtle` border on these fills is what the
+// refresh is removing.
+// ============================================================================
+val SurfaceCard     = Color(0xFF161B26)  // card fill — cooler, above CinematicSurface
+val SurfaceCardDeep = Color(0xFF12161F)  // card fill bottom (used via cardBrush)
+val SurfaceCardHigh = Color(0xFF202739)  // nested element on a card (pills, icon wells)
+
+/** Vertical card fill: slightly lighter at the top, settling darker. */
+fun cardBrush(): Brush = Brush.verticalGradient(listOf(SurfaceCard, SurfaceCardDeep))
+
+/** Top-lit edge: catches light at the top, disappears at the bottom. */
+fun cardEdgeBrush(): Brush = Brush.verticalGradient(
+    listOf(Color(0x24FFFFFF), Color(0x05FFFFFF))
+)
+
+/** Decorative ambient glow core — never text, never a fill under text. */
+val GlowBrand = Color(0xFF7C3AED)
+
 
 // --- Backwards-compat aliases ---
 val iOSBlack          = CinematicBlack

@@ -20,15 +20,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.aicreatorstudio.app.ui.theme.accentBright
+import com.aicreatorstudio.app.ui.theme.accentDeep
+import com.aicreatorstudio.app.ui.theme.accentPrimary
+import com.aicreatorstudio.app.ui.theme.glowBrand
 import com.aicreatorstudio.app.ui.theme.AccentBright
-import com.aicreatorstudio.app.ui.theme.BorderSubtle
-import com.aicreatorstudio.app.ui.theme.CinematicSurface
 import com.aicreatorstudio.app.ui.theme.LabelPrimary
 import com.aicreatorstudio.app.ui.theme.LabelSecondary
+import com.aicreatorstudio.app.ui.theme.cardBrush
+import com.aicreatorstudio.app.ui.theme.cardEdgeBrush
 
 /**
  * "Nothing here yet" placeholder for a list or section.
@@ -49,26 +54,33 @@ fun EmptyState(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(CinematicSurface)
-            .border(1.dp, BorderSubtle, RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .background(cardBrush())
+            .border(1.dp, cardEdgeBrush(), RoundedCornerShape(20.dp))
             .padding(vertical = 28.dp, horizontal = 20.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Box(
             modifier = Modifier
-                .size(56.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(AccentBright.copy(alpha = 0.10f))
-                .border(1.dp, AccentBright.copy(alpha = 0.22f), RoundedCornerShape(16.dp)),
+                .size(60.dp)
+                .clip(RoundedCornerShape(17.dp))
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            accentBright().copy(alpha = 0.24f),
+                            accentBright().copy(alpha = 0.07f)
+                        )
+                    )
+                )
+                .border(1.dp, accentBright().copy(alpha = 0.30f), RoundedCornerShape(17.dp)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = null,
-                tint = AccentBright,
-                modifier = Modifier.size(26.dp)
+                tint = accentBright(),
+                modifier = Modifier.size(28.dp)
             )
         }
         Text(

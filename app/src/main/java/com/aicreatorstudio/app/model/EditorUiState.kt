@@ -171,6 +171,37 @@ data class EditorUiState(
      */
     val hasGroqApiKey: Boolean = false,
     /**
+     * 2026-11-01 — PERSIAN SUBTITLE AI CORRECTION.
+     *
+     * A SEPARATE state channel from [subtitleGenerationState] on
+     * purpose: a correction run must not make the Generate button look
+     * busy, and a Whisper run must not make the correction row look
+     * busy. The card renders both independently.
+     *
+     * Nothing here mutates the project. A run lands in
+     * [com.aicreatorstudio.app.ai.subtitle.correction.AiCorrectionState.Review]
+     * and waits for the user's explicit accept — which is what makes
+     * "a failed correction leaves the original subtitles intact" true
+     * by construction.
+     */
+    val subtitleCorrection:
+        com.aicreatorstudio.app.ai.subtitle.correction.AiCorrectionState =
+        com.aicreatorstudio.app.ai.subtitle.correction.AiCorrectionState.Idle,
+    /**
+     * 2026-11-01 — the chat model the correction stage will use. Kept
+     * in the UI state so the picker chip renders without touching
+     * SharedPreferences on every recomposition; written through
+     * [EditorViewModel.selectSubtitleCorrectionModel].
+     */
+    val subtitleCorrectionModelId: String =
+        com.aicreatorstudio.app.ai.groq.GroqChatModels.DEFAULT,
+    /**
+     * 2026-11-01 — true once the user has been told that the
+     * correction stage sends subtitle TEXT to Groq. The card shows the
+     * notice once, before the first request.
+     */
+    val subtitleCorrectionDisclosureAcknowledged: Boolean = false,
+    /**
      * 2026-09-06 — the spoken-language hint for AI subtitles. The
      * Medium / Large-v3 checkpoints are multilingual (99 languages);
      * this selection tells whisper.cpp which language to expect so

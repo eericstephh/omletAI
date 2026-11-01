@@ -1,17 +1,15 @@
 package com.aicreatorstudio.app.ui.theme
 
 import android.provider.Settings
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import com.aicreatorstudio.app.settings.ThemeMode
+import com.aicreatorstudio.app.settings.AppTheme
 
 // ============================================================================
 // Main theme entry point
@@ -29,16 +27,16 @@ import com.aicreatorstudio.app.settings.ThemeMode
 /** True when the platform allows animation. Mirrors Android's remove-animations setting. */
 val LocalMotionEnabled = staticCompositionLocalOf { true }
 
-private val DarkColorScheme = darkColorScheme(
-    primary               = AccentPrimary,
+private fun darkScheme(accents: AccentColors) = darkColorScheme(
+    primary               = accents.accent,
     onPrimary             = Color.White,
-    primaryContainer      = Color(0xFF241A4A),
-    onPrimaryContainer    = AccentBright,
+    primaryContainer      = accents.container,
+    onPrimaryContainer    = accents.bright,
 
-    secondary             = AccentSecondary,
+    secondary             = accents.accent,
     onSecondary           = Color.White,
-    secondaryContainer    = Color(0xFF241A4A),
-    onSecondaryContainer  = Color(0xFFE3DFFF),
+    secondaryContainer    = accents.container,
+    onSecondaryContainer  = accents.bright,
 
     tertiary              = AccentCyan,
     onTertiary            = Color.Black,
@@ -52,7 +50,7 @@ private val DarkColorScheme = darkColorScheme(
     onSurface             = LabelPrimary,
     surfaceVariant        = CinematicElevated,
     onSurfaceVariant      = LabelSecondary,
-    surfaceTint           = AccentPrimary,
+    surfaceTint           = accents.accent,
 
     error                 = StatusError,
     onError               = Color(0xFF3B0A0A),
@@ -61,40 +59,6 @@ private val DarkColorScheme = darkColorScheme(
 
     outline               = BorderSubtle,
     outlineVariant        = Color(0xFF232A36)
-)
-
-private val LightColorScheme = lightColorScheme(
-    primary               = iOSBlue,
-    onPrimary             = Color.White,
-    primaryContainer      = Color(0xFFD1E4FF),
-    onPrimaryContainer    = Color(0xFF001A41),
-
-    secondary             = iOSIndigo,
-    onSecondary           = Color.White,
-    secondaryContainer    = Color(0xFFE3DFFF),
-    onSecondaryContainer  = Color(0xFF1A0066),
-
-    tertiary              = iOSCyan,
-    onTertiary            = Color.Black,
-    tertiaryContainer     = Color(0xFFCAF5FF),
-    onTertiaryContainer   = Color(0xFF001F29),
-
-    background            = iOSLightBackground,
-    onBackground          = iOSLightLabelPrimary,
-
-    surface               = iOSLightSurface,
-    onSurface             = iOSLightLabelPrimary,
-    surfaceVariant        = iOSLightSurfaceHigh,
-    onSurfaceVariant      = iOSLightLabelSecondary,
-    surfaceTint           = iOSBlue,
-
-    error                 = Color(0xFFBA1A1A),
-    onError               = Color.White,
-    errorContainer        = Color(0xFFFFDAD6),
-    onErrorContainer      = Color(0xFF410002),
-
-    outline               = Color(0x993C3C43),
-    outlineVariant        = Color(0x4D3C3C43)
 )
 
 /**
@@ -116,33 +80,35 @@ private fun rememberMotionEnabled(): Boolean {
     }
 }
 
+/**
+ * 2026-11-01 — the theme parameter is now an [AppTheme] (one of three
+ * selectable identities), not a dark/light/system switch. All three are
+ * dark-authored — see the KDoc on [AppTheme] for why light was retired —
+ * so one dark scheme shape is parameterised by the theme's accent family,
+ * and the same family is published through [LocalAccentColors] for the
+ * app's own tokens.
+ */
 @Composable
 fun AICreatorStudioTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    theme: AppTheme = AppTheme.VIOLET_NIGHT,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val accents = when (theme) {
+        AppTheme.VIOLET_NIGHT -> VioletAccents
+        AppTheme.OCEAN -> OceanAccents
+        AppTheme.ROSE -> RoseAccents
+    }
     val motionEnabled = rememberMotionEnabled()
 
-    CompositionLocalProvider(LocalMotionEnabled provides motionEnabled) {
+    CompositionLocalProvider(
+        LocalMotionEnabled provides motionEnabled,
+        LocalAccentColors provides accents
+    ) {
         MaterialTheme(
-            colorScheme = colorScheme,
+            colorScheme = darkScheme(accents),
             typography  = Typography,
             shapes      = AppShapes,
             content     = content
         )
     }
-}
-
-@Composable
-fun AICreatorStudioTheme(
-    themeMode: ThemeMode,
-    content: @Composable () -> Unit
-) {
-    val isDark = when (themeMode) {
-        ThemeMode.DARK  -> true
-        ThemeMode.LIGHT -> false
-        ThemeMode.SYSTEM -> isSystemInDarkTheme()
-    }
-    AICreatorStudioTheme(darkTheme = isDark, content = content)
 }

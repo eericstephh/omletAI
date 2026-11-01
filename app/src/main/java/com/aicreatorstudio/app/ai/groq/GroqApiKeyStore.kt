@@ -298,6 +298,46 @@ class GroqApiKeyStore @Inject constructor(
         prefs.getString(KEY_MODEL_ID, null)
     )
 
+    // ----------------------------------------------------------------
+    // 2026-11-01 - subtitle AI correction (chat model + disclosure)
+    // ----------------------------------------------------------------
+
+    /** Persist the chat model used by the subtitle-correction stage. */
+    fun saveCorrectionModelId(modelId: String) {
+        prefs.edit().putString(KEY_CORRECTION_MODEL_ID, modelId.trim()).apply()
+    }
+
+    /**
+     * The chat model for subtitle correction, or
+     * [GroqChatModels.DEFAULT] when unset.
+     *
+     * An unknown/stale id is resolved away by
+     * [GroqChatModels.resolveModelId] so a corrupted pref cannot send
+     * an id the account may not have. This is a DIFFERENT pref from
+     * [modelId]: the transcription model is an audio model and must
+     * never be reused for a chat request.
+     */
+    fun correctionModelId(): String = GroqChatModels.resolveModelId(
+        prefs.getString(KEY_CORRECTION_MODEL_ID, null)
+    )
+
+    /**
+     * True once the user has been told that the correction stage
+     * sends subtitle TEXT to Groq.
+     *
+     * The disclosure is shown once, before the first request, and the
+     * acknowledgement is persisted here so a returning user is not
+     * nagged on every run. It is a privacy notice, not a consent
+     * gate for the transcription path (which already uploads audio).
+     */
+    fun hasAcknowledgedCorrectionDisclosure(): Boolean =
+        prefs.getBoolean(KEY_CORRECTION_DISCLOSURE, false)
+
+    /** Record that the user read the correction privacy notice. */
+    fun acknowledgeCorrectionDisclosure() {
+        prefs.edit().putBoolean(KEY_CORRECTION_DISCLOSURE, true).apply()
+    }
+
     // ---- crypto internals ----
 
     /**
@@ -335,6 +375,10 @@ class GroqApiKeyStore @Inject constructor(
         private const val KEY_BLOB = "api_key_v1"
         private const val KEY_ENDPOINT = "endpoint_url"
         private const val KEY_MODEL_ID = "model_id"
+        /** 2026-11-01 - chat model for subtitle correction (non-secret). */
+        private const val KEY_CORRECTION_MODEL_ID = "correction_model_id"
+        /** 2026-11-01 - "the user has read the text-upload notice". */
+        private const val KEY_CORRECTION_DISCLOSURE = "correction_disclosure_ack"
         private const val ANDROID_KEYSTORE = "AndroidKeyStore"
         private const val KEY_ALIAS = "aicreatorstudio_groq_key"
         private const val TRANSFORMATION = "AES/GCM/NoPadding"
@@ -440,6 +484,55 @@ object GroqEndpoints {
             GroqConnectionTester.MODELS_ENDPOINT
         }
     }
+
+    /**
+     * Derive the OpenAI-compatible **chat-completions** URL from a
+     * transcription endpoint.
+     *
+     * ## Why derived, not hardcoded
+     *
+     * Same reason as [modelsUrl]: the key, the transcription request
+     * and the subtitle-correction request must all target ONE server.
+     * If the correction stage hardcoded `api.groq.com` while the user
+     * had configured another OpenAI-compatible endpoint, a key that
+     * works for transcription would mysteriously fail for correction
+     * (and the reverse), and no message could explain it.
+     *
+     * Rules (identical base-path rules to [modelsUrl]):
+     * - `.../v1/audio/transcriptions` -> `.../v1/chat/completions`
+     * - `.../v1/transcriptions`       -> `.../v1/chat/completions`
+     * - any other path                -> `<path>/chat/completions`
+     * - unparsable / bad scheme       -> [DEFAULT_CHAT_URL]
+     *
+     * Pure + JVM testable (no Android, no network).
+     */
+    fun chatUrl(transcriptionEndpoint: String): String {
+        val raw = transcriptionEndpoint.trim()
+        if (raw.isBlank()) return DEFAULT_CHAT_URL
+        return try {
+            val u = URI(raw)
+            val scheme = u.scheme?.lowercase()
+            if (scheme != "https" && scheme != "http") return DEFAULT_CHAT_URL
+            val host = u.host
+            if (host.isNullOrBlank()) return DEFAULT_CHAT_URL
+            val port = if (u.port > 0) ":${u.port}" else ""
+            var path = u.path ?: ""
+            while (path.endsWith("/")) path = path.dropLast(1)
+            for (suffix in TRANSCRIPTION_SUFFIXES) {
+                if (path.endsWith(suffix)) {
+                    path = path.dropLast(suffix.length)
+                    break
+                }
+            }
+            if (path.isBlank()) path = "/v1"
+            "$scheme://$host$port$path/chat/completions"
+        } catch (_: Exception) {
+            DEFAULT_CHAT_URL
+        }
+    }
+
+    /** Groq's documented chat-completions endpoint (POST). */
+    const val DEFAULT_CHAT_URL: String = "https://api.groq.com/openai/v1/chat/completions"
 
     /** Path suffixes that identify a transcription endpoint. */
     private val TRANSCRIPTION_SUFFIXES = listOf("/audio/transcriptions", "/transcriptions")

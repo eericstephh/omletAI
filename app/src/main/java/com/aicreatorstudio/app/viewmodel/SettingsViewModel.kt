@@ -7,15 +7,14 @@ import com.aicreatorstudio.app.ai.AiModelCatalog
 import com.aicreatorstudio.app.ai.AiModelInstaller
 import com.aicreatorstudio.app.ai.AiModels
 import com.aicreatorstudio.app.settings.AppSettings
+import com.aicreatorstudio.app.settings.AppTheme
 import com.aicreatorstudio.app.settings.SettingsRepository
-import com.aicreatorstudio.app.settings.ThemeMode
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -25,8 +24,16 @@ class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository
 ) : ViewModel() {
 
-    private val _settings = MutableStateFlow(AppSettings())
-    val settings: StateFlow<AppSettings> = _settings.asStateFlow()
+    // 2026-11-01 — expose the repository StateFlow directly instead of a
+    // private default-seeded copy. The old `MutableStateFlow(AppSettings())`
+    // never loaded persisted values, so every fresh entry into this screen
+    // displayed defaults (theme badge back on Violet after an Ocean/Rose
+    // pick, export quality reverting visually, ...) even though the rest of
+    // the app — which reads `settings.SettingsViewModel` — showed the truth.
+    // The repository is a synchronous-loading @Singleton: its `.value` is
+    // always the persisted state, and every mutator below already writes
+    // through it, so this is a pure staleness fix with identical write paths.
+    val settings: StateFlow<AppSettings> = settingsRepository.settings
 
     // ------------------------------------------------------------------
     // 2026-09-06 — AI model downloads. Every model the app can use is
@@ -100,64 +107,52 @@ class SettingsViewModel @Inject constructor(
         return if (mb >= 1024) "%.1f GB".format(mb / 1024.0) else "${mb.toInt()} MB"
     }
 
-    fun updateThemeMode(mode: ThemeMode) {
-        settingsRepository.updateThemeMode(mode)
-        _settings.update { it.copy(themeMode = mode) }
+    fun updateTheme(theme: AppTheme) {
+        settingsRepository.updateTheme(theme)
     }
 
     fun updateSnapToGrid(enabled: Boolean) {
         settingsRepository.updateSnapToGrid(enabled)
-        _settings.update { it.copy(snapToGrid = enabled) }
     }
 
     fun updateGridSnapSize(size: Int) {
         settingsRepository.updateGridSnapSize(size)
-        _settings.update { it.copy(gridSnapSize = size) }
     }
 
     fun updateTransitionDuration(durationMs: Long) {
         settingsRepository.updateTransitionDuration(durationMs)
-        _settings.update { it.copy(defaultTransitionDurationMs = durationMs) }
     }
 
     fun updateMaxUndoSteps(steps: Int) {
         settingsRepository.updateMaxUndoSteps(steps)
-        _settings.update { it.copy(maxUndoSteps = steps) }
     }
 
     fun updateExportQuality(quality: String) {
         settingsRepository.updateExportQuality(quality)
-        _settings.update { it.copy(defaultExportQuality = quality) }
     }
 
     fun updateHardwareAcceleration(enabled: Boolean) {
         settingsRepository.updateHardwareAcceleration(enabled)
-        _settings.update { it.copy(hardwareAcceleration = enabled) }
     }
 
     fun updatePreviewFps(fps: Int) {
         settingsRepository.updatePreviewFps(fps)
-        _settings.update { it.copy(previewFps = fps) }
     }
 
     fun updateShowFrameCount(show: Boolean) {
         settingsRepository.updateShowFrameCount(show)
-        _settings.update { it.copy(showFrameCount = show) }
     }
 
     fun updateAutoSave(enabled: Boolean) {
         settingsRepository.updateAutoSave(enabled)
-        _settings.update { it.copy(autoSaveEnabled = enabled) }
     }
 
     fun updateHapticFeedback(enabled: Boolean) {
         settingsRepository.updateHapticFeedback(enabled)
-        _settings.update { it.copy(hapticFeedback = enabled) }
     }
 
     fun updateTextFont(font: String) {
         settingsRepository.updateTextFont(font)
-        _settings.update { it.copy(defaultTextFont = font) }
     }
 
     /**

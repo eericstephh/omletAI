@@ -34,6 +34,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -43,15 +44,19 @@ import androidx.compose.ui.unit.dp
 import com.aicreatorstudio.app.model.ToolPanel
 import com.aicreatorstudio.app.ui.components.t
 import com.aicreatorstudio.app.ui.theme.AccentBright
+import com.aicreatorstudio.app.ui.theme.accentBright
+import com.aicreatorstudio.app.ui.theme.accentDeep
+import com.aicreatorstudio.app.ui.theme.accentPrimary
+import com.aicreatorstudio.app.ui.theme.glowBrand
 import com.aicreatorstudio.app.ui.theme.AccentCyan
 import com.aicreatorstudio.app.ui.theme.AccentSecondary
-import com.aicreatorstudio.app.ui.theme.BorderSubtle
-import com.aicreatorstudio.app.ui.theme.CinematicSurface
 import com.aicreatorstudio.app.ui.theme.LabelPrimary
-import com.aicreatorstudio.app.ui.theme.LabelSecondary
+import com.aicreatorstudio.app.ui.theme.LabelTertiary
 import com.aicreatorstudio.app.ui.theme.StatusInfo
 import com.aicreatorstudio.app.ui.theme.StatusSuccess
 import com.aicreatorstudio.app.ui.theme.StatusWarning
+import com.aicreatorstudio.app.ui.theme.cardBrush
+import com.aicreatorstudio.app.ui.theme.cardEdgeBrush
 
 /**
  * The home screen's AI capability catalogue.
@@ -296,9 +301,9 @@ private fun AiCapabilityTile(
 ) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(14.dp))
-            .background(CinematicSurface)
-            .border(1.dp, BorderSubtle, RoundedCornerShape(14.dp))
+            .clip(RoundedCornerShape(16.dp))
+            .background(cardBrush())
+            .border(1.dp, cardEdgeBrush(), RoundedCornerShape(16.dp))
             .clickable(
                 role = Role.Button,
                 onClickLabel = capability.title,
@@ -307,20 +312,33 @@ private fun AiCapabilityTile(
             .padding(horizontal = 10.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // The icon tile: a clean shape on a quiet tint of the
-        // capability's accent.
+        // The icon well: the capability's own accent as a vertical tint
+        // with a matching hairline, so each tile carries a hint of its
+        // colour without twelve competing full-colour blocks.
         Box(
             modifier = Modifier
-                .size(34.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(capability.accent.copy(alpha = 0.12f)),
+                .size(36.dp)
+                .clip(RoundedCornerShape(11.dp))
+                .background(
+                    Brush.verticalGradient(
+                        listOf(
+                            capability.accent.copy(alpha = 0.26f),
+                            capability.accent.copy(alpha = 0.08f)
+                        )
+                    )
+                )
+                .border(
+                    1.dp,
+                    capability.accent.copy(alpha = 0.35f),
+                    RoundedCornerShape(11.dp)
+                ),
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = capability.icon,
                 contentDescription = null,
                 tint = capability.accent,
-                modifier = Modifier.size(18.dp)
+                modifier = Modifier.size(19.dp)
             )
         }
 
@@ -335,7 +353,7 @@ private fun AiCapabilityTile(
         Text(
             text = t(capability.description),
             style = MaterialTheme.typography.bodySmall,
-            color = LabelSecondary,
+            color = LabelTertiary,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis
         )

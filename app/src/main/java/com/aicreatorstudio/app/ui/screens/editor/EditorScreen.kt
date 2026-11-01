@@ -94,6 +94,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -147,6 +148,7 @@ import com.aicreatorstudio.app.model.ClipIdTransformUpdater
 import com.aicreatorstudio.app.model.CropPreset
 import com.aicreatorstudio.app.model.boundsNormalized
 import com.aicreatorstudio.app.model.isVisibleAtTime
+import com.aicreatorstudio.app.model.isSubtitle
 import com.aicreatorstudio.app.model.EditorContext
 import com.aicreatorstudio.app.model.EditorUiState
 import com.aicreatorstudio.app.model.editorContext
@@ -166,6 +168,10 @@ import com.aicreatorstudio.app.ai.WhisperModelSpec
 import com.aicreatorstudio.app.ai.AiToolState
 import com.aicreatorstudio.app.ai.upscale.UpscaleProfile
 import com.aicreatorstudio.app.ai.upscale.UpscaleProgress
+import com.aicreatorstudio.app.ui.theme.accentBright
+import com.aicreatorstudio.app.ui.theme.accentDeep
+import com.aicreatorstudio.app.ui.theme.accentPrimary
+import com.aicreatorstudio.app.ui.theme.glowBrand
 import com.aicreatorstudio.app.ui.theme.Hairline
 import com.aicreatorstudio.app.ui.theme.HairlineSubtle
 import com.aicreatorstudio.app.ui.theme.BorderSubtle
@@ -401,6 +407,10 @@ fun EditorScreen(
     // (expansion / feather / reverse): three more arguments in that
     // `AnimatedVisibility` lambda pushed it past the limit a second
     // time, so they travel through `LocalMattingPanelActions` too.
+    // 2026-11-01 — Persian Subtitle AI Correction, third user of this
+    // pattern. Same cause, same cure: the correction row needs four
+    // actions at the bottom of the sub-panel tree, and that
+    // `AnimatedVisibility` lambda has no room left.
     CompositionLocalProvider(
         LocalVoiceoverActions provides remember {
             VoiceoverPanelActions(
@@ -416,6 +426,14 @@ fun EditorScreen(
                 onFeatherChanged = viewModel::setMattingFeather,
                 onReverseChanged = viewModel::setMattingReverse,
                 onKnobDragFinished = viewModel::endMattingKnobGesture
+            )
+        },
+        LocalSubtitleCorrectionActions provides remember {
+            SubtitleCorrectionActions(
+                onStart = viewModel::startSubtitleCorrection,
+                onCancel = viewModel::cancelSubtitleCorrection,
+                onSelectModel = viewModel::selectSubtitleCorrectionModel,
+                onAcknowledge = viewModel::acknowledgeSubtitleCorrectionDisclosure
             )
         }
     ) {
@@ -526,8 +544,20 @@ private fun EditorScreenBody(
     // name, and write to the user-chosen URI on IO. The ViewModel
     // is the single source of truth for the trigger so the picker
     // never pops up unintentionally.
+    //
+    // 2026-10-31 FIX — the contract used to be
+    // `CreateDocument("application/x-subrip")`. `ACTION_CREATE_DOCUMENT`
+    // asks every DocumentsProvider whether it can CREATE a document of
+    // that MIME type; `application/x-subrip` is not in Android's MIME
+    // registry, so providers that filter by type offered no writable
+    // location and the picker came up with the Save button dead — the
+    // export produced nothing and no error. SRT is a plain-text format
+    // (the spec is ASCII/UTF-8 text), and `text/plain` is creatable
+    // everywhere. The `.srt` extension still comes from
+    // [SrtExportTrigger.suggestedFileName], which is what the picker
+    // uses as the display name, so the file is still `name.srt`.
     val srtSaveLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument("application/x-subrip")
+        contract = ActivityResultContracts.CreateDocument("text/plain")
     ) { uri ->
         if (uri != null) {
             val body = uiState.srtExportTrigger?.srtBody
@@ -1856,6 +1886,25 @@ private fun EditorScreenBody(
             )
         }
 
+        // 2026-11-01 — PERSIAN SUBTITLE AI CORRECTION review.
+        //
+        // Hosted HERE rather than inside the Subs card so the diff stays
+        // readable after the user closes the sub-panel, and so the
+        // accept/reject decision cannot be lost to a panel switch. The
+        // dialog is a pure function of `uiState.subtitleCorrection`: it
+        // appears exactly when a preview exists, and dismissing it
+        // rejects (writes nothing).
+        val correctionState = uiState.subtitleCorrection
+        if (correctionState is com.aicreatorstudio.app.ai.subtitle.correction
+                .AiCorrectionState.Review
+        ) {
+            SubtitleCorrectionReviewDialog(
+                preview = correctionState.preview,
+                onAccept = { viewModel.acceptSubtitleCorrection() },
+                onReject = { viewModel.rejectSubtitleCorrection() }
+            )
+        }
+
         // Hide the timeline when a tool panel is active so the video
         // preview expands to fill the freed space and the tool controls
         // have room above the dock.  The timeline state (playhead,
@@ -2649,7 +2698,7 @@ private fun ExportPill(enabled: Boolean, onClick: () -> Unit) {
             .heightIn(min = 44.dp)
             .clip(RoundedCornerShape(percent = 50))
             .background(ctaBrush())
-            .border(1.dp, AccentDeep.copy(alpha = 0.5f), RoundedCornerShape(percent = 50))
+            .border(1.dp, accentDeep().copy(alpha = 0.5f), RoundedCornerShape(percent = 50))
             .clickable(enabled = enabled, role = Role.Button) { onClick() }
             .padding(horizontal = 16.dp),
         contentAlignment = Alignment.Center
@@ -3990,7 +4039,7 @@ private fun EditorVideoPreviewSection(
                         .background(OnVideoScrimStrong)
                         .border(
                             1.dp,
-                            iOSBlueBright.copy(alpha = 0.55f),
+                            accentBright().copy(alpha = 0.55f),
                             RoundedCornerShape(percent = 50)
                         )
                         .padding(horizontal = 10.dp, vertical = 4.dp)
@@ -3998,7 +4047,7 @@ private fun EditorVideoPreviewSection(
                     Icon(
                         imageVector = Icons.Filled.MovieFilter,
                         contentDescription = null,
-                        tint = iOSBlueBright,
+                        tint = accentBright(),
                         modifier = Modifier.size(12.dp)
                     )
                     Spacer(Modifier.width(4.dp))
@@ -4710,7 +4759,7 @@ private fun TextOverlaySelectionChrome(
             )
             .border(
                 width = 2.dp,
-                color = iOSBlueBright,
+                color = accentBright(),
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp)
             )
     ) {
@@ -4821,8 +4870,8 @@ private fun EditorPlaybackStripSection(
             },
             valueRange = 0f..durationMs.coerceAtLeast(1).toFloat(),
             colors = SliderDefaults.colors(
-                thumbColor = AccentBright,
-                activeTrackColor = AccentPrimary,
+                thumbColor = accentBright(),
+                activeTrackColor = accentPrimary(),
                 // 2026-10-16 — was `Color.White.copy(0.10f)`, a raw literal
                 // that rendered the scrubber trough almost invisibly on the
                 // transport band. [BorderSubtle] is the token for a visible
@@ -6046,7 +6095,19 @@ private fun SubPanelContent(
             // and it included the transient srtExportTrigger, which
             // flipped the Generate button to "Generate again" for one
             // frame whenever the export picker launched.
-            hasGeneratedSubtitles = uiState.textOverlays.isNotEmpty(),
+            //
+            // 2026-10-31 FIX — the 2026-09-07 intent above was never
+            // actually implemented: the expression stayed
+            // `textOverlays.isNotEmpty()`, i.e. "ANY text overlay",
+            // decorative titles included. That is BROADER than what
+            // the export accepts, so a project whose only text was a
+            // title/watermark showed an enabled "Export SRT" button
+            // that could never write a file. Use the shared
+            // `TextOverlay.isSubtitle` predicate — the same one the
+            // Subs lane and `EditorViewModel.onExportSrtClicked`
+            // use — so the button's enabled state and the export's
+            // acceptance are the same question.
+            hasGeneratedSubtitles = uiState.textOverlays.any { it.isSubtitle },
             activeTranscriptionEngine = uiState.activeTranscriptionEngine,
             selectedModel = uiState.selectedWhisperModel,
             // 2026-10-10 — key-aware cloud row + missing-key warning
@@ -6099,9 +6160,24 @@ private fun SubPanelContent(
             onApplySubtitleStyleToAll = { style ->
                 onApplySubtitleStyleToAll(style)
             },
-            hasSubtitles = uiState.textOverlays.any {
-                it.subtitleSource != null
-            }
+            // 2026-10-31 — same predicate as the export gate above.
+            // The old `subtitleSource != null` spelling missed
+            // legacy AI captions that carry word timings but no tag,
+            // so "Style subtitles" hid itself on those projects.
+            hasSubtitles = uiState.textOverlays.any { it.isSubtitle },
+            // 2026-11-01 — PERSIAN SUBTITLE AI CORRECTION. State comes
+            // off `uiState`; the actions come from the ambient
+            // [LocalSubtitleCorrectionActions] provider installed in
+            // `EditorScreen`. Bundled into ONE value because this call
+            // site lives in a method that is already at the JVM's
+            // 64 KB ceiling.
+            correction = SubtitleCorrectionUi(
+                state = uiState.subtitleCorrection,
+                modelId = uiState.subtitleCorrectionModelId,
+                disclosureAcknowledged =
+                    uiState.subtitleCorrectionDisclosureAcknowledged,
+                actions = LocalSubtitleCorrectionActions.current
+            )
         )
         ToolPanel.AUDIO -> AudioPanel(
             selectedClip = selectedClip,
@@ -6610,6 +6686,111 @@ private fun SubPanelContent(
 }
 
 // ====================================================================
+// 2026-11-01 — Persian Subtitle AI Correction: review dialog
+// ====================================================================
+
+/**
+ * The accept/reject gate for the AI correction stage.
+ *
+ * ## Why a dialog and not an inline list
+ *
+ * The brief requires the user to REVIEW before anything is committed.
+ * An inline list inside the Subs card would disappear the moment the
+ * user tapped another tool, and a half-read diff that silently
+ * commits is worse than no feature. A dialog is modal, survives panel
+ * switches, and makes the two outcomes explicit.
+ *
+ * ## Why the original text is shown at all
+ *
+ * "Trust me, it's better" is not reviewable. Each row shows the
+ * before and after so a wrong homophone fix (خواهر/خاهر) can be
+ * caught by the person who knows what was said — the model cannot.
+ *
+ * ## Dismissing rejects
+ *
+ * `onDismissRequest` maps to reject, not to "later". There is no
+ * hidden state: closing the dialog leaves the subtitles exactly as
+ * they were, which is also what the Cancel button does.
+ */
+@Composable
+private fun SubtitleCorrectionReviewDialog(
+    preview: com.aicreatorstudio.app.ai.subtitle.correction.CorrectionPreview,
+    onAccept: () -> Unit,
+    onReject: () -> Unit
+) {
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = onReject,
+        title = {
+            Text(
+                text = "بازبینی اصلاح زیرنویس",
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 380.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = "‏${preview.items.size} مورد از ${preview.totalReviewed} " +
+                        "زیرنویس اصلاح می‌شود. زمان‌بندی‌ها تغییر نمی‌کند.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.75f)
+                )
+
+                if (preview.retimedCount > 0) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        // Honest about the one thing that IS approximated.
+                        text = "در ${preview.retimedCount} مورد تعداد کلمات تغییر کرده است؛ " +
+                            "زمان‌بندی کلمات همان بازهٔ قبلی بین کلمات جدید تقسیم می‌شود.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    )
+                }
+
+                if (preview.failedBatches.isNotEmpty()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        text = "‏${preview.failedBatches.size} بخش اصلاح نشد و متن اصلی خود را " +
+                            "حفظ کرد" + (preview.failureMessage?.let { ": $it" } ?: ""),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+
+                Spacer(Modifier.height(10.dp))
+
+                preview.items.forEach { item ->
+                    Column(modifier = Modifier.padding(vertical = 6.dp)) {
+                        Text(
+                            text = item.original,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                        )
+                        Spacer(Modifier.height(2.dp))
+                        Text(
+                            text = item.corrected,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onAccept) { Text("اعمال اصلاحات") }
+        },
+        dismissButton = {
+            TextButton(onClick = onReject) { Text("رد کردن") }
+        }
+    )
+}
+
+// ====================================================================
 // Media Missing banner (project restoration safety net)
 // ====================================================================
 
@@ -6677,8 +6858,7 @@ private fun MediaMissingBanner(
 // ====================================================================
 
 @Composable
-private fun ErrorBanner(message: String, onDismiss: () -> Unit) {
-    Row(
+private fun ErrorBanner(message: String, onDismiss: () -> Unit) {    Row(
         verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()

@@ -176,6 +176,31 @@ data class TextOverlay(
 }
 
 /**
+ * True when this overlay is a SUBTITLE rather than decorative text
+ * (title, watermark, paragraph).
+ *
+ * This is the single, pure definition of "is a subtitle" for the
+ * tag/word part of the test. Callers that also track the in-memory
+ * id sets (`aiSubtitleOverlayIds` / `srtImportedOverlayIds`) OR this
+ * with their set membership.
+ *
+ * ## Why it is centralised
+ *
+ * The Subs lane, its hit-testing, the global subtitle-style features
+ * and the SRT export each spelled the test out by hand and had
+ * drifted apart. The export was the narrowest of the four
+ * (`subtitleSource in {"ai","srt"}` OR the in-memory AI id set), so a
+ * caption that carries word timings but lost its tag exported as
+ * nothing while the Subs lane still showed it — the "Export SRT
+ * button does nothing" bug. One predicate, one behaviour.
+ *
+ * Kept as a top-level `val` in `model/` so a JVM test can pin it
+ * without an Android runtime.
+ */
+val TextOverlay.isSubtitle: Boolean
+    get() = subtitleSource != null || words.isNotEmpty()
+
+/**
  * Text style preset options.
  */
 enum class TextStylePreset(val displayName: String) {

@@ -176,16 +176,34 @@ class GlobalSubtitleFontSizeWiringTest {
     fun `subtitle predicate cannot sweep decorative text`() {
         val src = viewModelSource()
         val body = functionRegion(src, "private fun isSubtitleOverlay(")
-        // The predicate mirrors the SRT-export filter: explicit tags,
-        // word timings, or the in-memory id sets. Decorative text has
-        // none of those.
-        assertTrue(body.contains("subtitleSource != null"))
-        assertTrue(body.contains("words.isNotEmpty()"))
+        // 2026-11-01 — the tag/word half of this test moved into the
+        // shared `TextOverlay.isSubtitle` extension (model/TextOverlay.kt)
+        // because four hand-written copies of it had drifted apart; the
+        // SRT-export gate was the narrowest and exported nothing. The
+        // BEHAVIOUR asserted here is unchanged, so the test now checks
+        // that this predicate delegates to the shared definition and
+        // still ORs in the in-memory id sets — instead of re-spelling
+        // `subtitleSource != null` / `words.isNotEmpty()` locally, which
+        // is exactly the duplication that caused the bug.
+        assertTrue(
+            "the predicate must delegate to the shared isSubtitle extension",
+            body.contains("isSubtitle")
+        )
         assertTrue(body.contains("aiSubtitleOverlayIds"))
         assertTrue(body.contains("srtImportedOverlayIds"))
         assertTrue(
             "selection must NOT decide the batch scope",
             !body.contains("selectedTextId")
+        )
+
+        // And the shared definition itself must still exclude
+        // decorative text: a tag or word timings, nothing else.
+        val overlaySource = read(
+            "app/src/main/java/com/aicreatorstudio/app/model/TextOverlay.kt"
+        )
+        assertTrue(
+            "isSubtitle must key on the tag or the word timings",
+            overlaySource.contains("subtitleSource != null || words.isNotEmpty()")
         )
     }
 

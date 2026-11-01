@@ -43,7 +43,14 @@ import com.aicreatorstudio.app.model.PersianFont
 import com.aicreatorstudio.app.model.SubtitleMessages
 import com.aicreatorstudio.app.model.SubtitleEditOps
 import com.aicreatorstudio.app.model.TextOverlay
+import com.aicreatorstudio.app.model.isSubtitle
 import com.aicreatorstudio.app.model.withTemplate
+// 2026-11-01 — PERSIAN SUBTITLE AI CORRECTION. The state machine is
+// imported by name so the `is` / `as?` checks stay on one line; a
+// multiline fully-qualified type inside an `is` is exactly the kind of
+// thing that compiles today and breaks on the next rename. The other
+// collaborators are written fully-qualified at their (few) use sites.
+import com.aicreatorstudio.app.ai.subtitle.correction.AiCorrectionState
 import com.aicreatorstudio.app.model.UpscalerPreset
 import com.aicreatorstudio.app.model.UpscalerSettings
 import com.aicreatorstudio.app.model.VideoClip
@@ -138,6 +145,16 @@ class EditorViewModel @Inject constructor(
      */
     private val omeletLog: com.aicreatorstudio.app.logging.OmeletLog,
     private val customFontRepository: CustomFontRepository,
+    /**
+     * 2026-11-01 — PERSIAN SUBTITLE AI CORRECTION.
+     *
+     * A separate collaborator from [subtitleGenerator] on purpose: the
+     * correction stage talks to a chat model and must never be able to
+     * reach the transcription pipeline, so there is no path from here
+     * to the Whisper engine.
+     */
+    private val subtitleCorrector:
+        com.aicreatorstudio.app.ai.subtitle.correction.PersianSubtitleCorrector,
     savedStateHandle: SavedStateHandle,
     @ApplicationContext private val appContext: Context
 ) : ViewModel() {
@@ -193,6 +210,17 @@ class EditorViewModel @Inject constructor(
      * 30-second whisper windows.
      */
     private var subtitleGenerationJob: Job? = null
+
+    /**
+     * 2026-11-01 — the in-flight AI-correction coroutine, if any.
+     *
+     * Held as a field (not read off `viewModelScope`) so
+     * [cancelSubtitleCorrection] can interrupt the batch loop between
+     * requests. It is a SEPARATE job from [subtitleGenerationJob]:
+     * cancelling a correction must never abort a Whisper run, and
+     * vice versa.
+     */
+    private var subtitleCorrectionJob: Job? = null
 
     private companion object {
         const val TAG_SUBS = "EditorViewModel"
@@ -423,7 +451,19 @@ class EditorViewModel @Inject constructor(
         // 2b. 2026-10-10 — surface whether a Groq key is saved so the
         // Subs card shows real cloud readiness (not a hardcoded
         // "Cloud" ready pill).
-        _uiState.update { it.copy(hasGroqApiKey = subtitleGenerator.hasUserGroqKey()) }
+        //
+        // 2026-11-01 — the same read seeds the AI-correction stage:
+        // the chosen chat model (resolved against the catalog, so a
+        // stale pref can never reach the wire) and whether the
+        // "subtitle text leaves the device" notice has been seen.
+        _uiState.update {
+            it.copy(
+                hasGroqApiKey = subtitleGenerator.hasUserGroqKey(),
+                subtitleCorrectionModelId = subtitleCorrector.modelId(),
+                subtitleCorrectionDisclosureAcknowledged =
+                    subtitleCorrector.hasAcknowledgedDisclosure()
+            )
+        }
 
         // 3. AI tool model states from the live engines.
         //
@@ -2105,12 +2145,20 @@ class EditorViewModel @Inject constructor(
     /** The sp band the global-size control may produce. */
     val globalSubtitleSizeRange: ClosedFloatingPointRange<Float> = 14f..42f
 
-    /** True when [overlay] is a subtitle (never decorative text). */
+    /**
+     * True when [overlay] is a subtitle (never decorative text).
+     *
+     * 2026-10-31 — delegates the pure part to
+     * [com.aicreatorstudio.app.model.isSubtitle] so the timeline, the
+     * global style tools and the SRT export can never drift apart
+     * again. The in-memory id sets are OR-ed on top because they
+     * cover overlays created earlier in this session whose tag has
+     * not been re-read from storage yet.
+     */
     private fun isSubtitleOverlay(
         overlay: com.aicreatorstudio.app.model.TextOverlay
     ): Boolean =
-        overlay.subtitleSource != null ||
-            overlay.words.isNotEmpty() ||
+        overlay.isSubtitle ||
             overlay.id in aiSubtitleOverlayIds ||
             overlay.id in srtImportedOverlayIds
 
@@ -5413,6 +5461,288 @@ class EditorViewModel @Inject constructor(
         job.cancel()
     }
 
+    // ==================================================================
+    // 2026-11-01 — PERSIAN SUBTITLE AI CORRECTION
+    //
+    // Four actions, one contract:
+    //
+    //   startSubtitleCorrection()   -> runs the model, lands in Review.
+    //                                  NEVER writes the project.
+    //   acceptSubtitleCorrection()  -> the ONLY writer. Pushes history
+    //                                  (so it is undoable) and persists.
+    //   rejectSubtitleCorrection()  -> drops the preview, writes nothing.
+    //   cancelSubtitleCorrection()  -> aborts the run in flight.
+    //
+    // The split is the whole point: the network result is inert until
+    // the user says yes, which is what makes "a failed or refused
+    // correction leaves the original subtitles intact" structurally
+    // true rather than a matter of careful error handling.
+    //
+    // The stage is opt-in. Nothing calls startSubtitleCorrection()
+    // from generateSubtitles — a Whisper run never triggers it.
+    // ==================================================================
+
+    /** Persist the user's chat-model choice for the correction stage. */
+    fun selectSubtitleCorrectionModel(modelId: String) {
+        val resolved = com.aicreatorstudio.app.ai.groq.GroqChatModels.resolveModelId(modelId)
+        subtitleCorrector.setModelId(resolved)
+        _uiState.update { it.copy(subtitleCorrectionModelId = resolved) }
+    }
+
+    /** Record that the user has read the "text leaves the device" notice. */
+    fun acknowledgeSubtitleCorrectionDisclosure() {
+        subtitleCorrector.acknowledgeDisclosure()
+        _uiState.update { it.copy(subtitleCorrectionDisclosureAcknowledged = true) }
+    }
+
+    /**
+     * Run the correction over the current subtitle overlays.
+     *
+     * Preconditions, each with its own message so the user is never
+     * left guessing:
+     *  - a Groq key must be saved;
+     *  - there must be at least one subtitle overlay.
+     *
+     * Re-entrancy: a second call while a run is in flight is ignored
+     * (the brief's "avoid duplicate corrections or duplicate network
+     * requests"). The guard is the job reference, not the UI state,
+     * so a fast double-tap cannot slip through a recomposition.
+     */
+    fun startSubtitleCorrection() {
+        if (subtitleCorrectionJob?.isActive == true) return
+
+        if (!subtitleCorrector.isAvailable()) {
+            _uiState.update {
+                it.copy(
+                    subtitleCorrection = com.aicreatorstudio.app.ai.subtitle.correction
+                        .AiCorrectionState.Error(
+                            message = com.aicreatorstudio.app.ai.subtitle.correction
+                                .PersianSubtitleCorrector.MISSING_KEY_MESSAGE,
+                            kind = com.aicreatorstudio.app.ai.subtitle.correction
+                                .CorrectionFailureKind.AUTH,
+                            retryable = false
+                        )
+                )
+            }
+            return
+        }
+
+        // Snapshot NOW. The user may delete or edit captions while the
+        // request is in flight; the preview must describe the text the
+        // model actually saw, and the applier drops ids that no longer
+        // exist.
+        val snapshot = _uiState.value.textOverlays
+            .filter { it.isSubtitle && it.text.isNotBlank() }
+            .map {
+                com.aicreatorstudio.app.ai.subtitle.correction.CorrectionInputSegment(
+                    id = it.id,
+                    text = it.text
+                )
+            }
+        if (snapshot.isEmpty()) {
+            _uiState.update {
+                it.copy(
+                    subtitleCorrection = com.aicreatorstudio.app.ai.subtitle.correction
+                        .AiCorrectionState.Error(
+                            message = SubtitleMessages.NO_SUBTITLES_TO_CORRECT_FA,
+                            kind = com.aicreatorstudio.app.ai.subtitle.correction
+                                .CorrectionFailureKind.MALFORMED,
+                            retryable = false
+                        )
+                )
+            }
+            return
+        }
+
+        val modelId = _uiState.value.subtitleCorrectionModelId
+        _uiState.update {
+            it.copy(
+                subtitleCorrection = com.aicreatorstudio.app.ai.subtitle.correction
+                    .AiCorrectionState.Running(
+                        completedBatches = 0,
+                        totalBatches = 0
+                    )
+            )
+        }
+
+        subtitleCorrectionJob = viewModelScope.launch(Dispatchers.IO) {
+            try {
+                val run = subtitleCorrector.correct(
+                    segments = snapshot,
+                    modelId = modelId,
+                    onProgress = { done, total ->
+                        _uiState.update { state ->
+                            // A late tick must never resurrect a run the
+                            // user cancelled (cancel sets Idle) or a
+                            // terminal state that already landed.
+                            if (state.subtitleCorrection !is AiCorrectionState.Running) {
+                                state
+                            } else {
+                                state.copy(
+                                    subtitleCorrection = AiCorrectionState.Running(done, total)
+                                )
+                            }
+                        }
+                    }
+                )
+
+                if (run.cancelled) {
+                    _uiState.update {
+                        it.copy(
+                            subtitleCorrection = com.aicreatorstudio.app.ai.subtitle.correction
+                                .AiCorrectionState.Idle
+                        )
+                    }
+                    return@launch
+                }
+
+                val preview = com.aicreatorstudio.app.ai.subtitle.correction
+                    .CorrectionApplier.buildPreview(
+                        overlays = _uiState.value.textOverlays,
+                        corrected = run.segments,
+                        failedBatches = run.failedBatches,
+                        failureMessage = run.failureMessage,
+                        modelId = modelId
+                    )
+
+                val nothingCorrected = preview.isEmpty && preview.failedBatches.isEmpty()
+                when {
+                    // Nothing came back at all -> an error the user can
+                    // act on, not an empty review screen.
+                    preview.isEmpty && run.failureMessage != null -> {
+                        _uiState.update {
+                            it.copy(
+                                subtitleCorrection = com.aicreatorstudio.app.ai.subtitle.correction
+                                    .AiCorrectionState.Error(
+                                        message = run.failureMessage,
+                                        kind = run.failureKind
+                                            ?: com.aicreatorstudio.app.ai.subtitle.correction
+                                                .CorrectionFailureKind.UNKNOWN,
+                                        retryable = true
+                                    )
+                            )
+                        }
+                    }
+                    // The model ran and had nothing to fix. That is a
+                    // success, and saying so is more useful than a
+                    // dialog with zero rows.
+                    nothingCorrected -> {
+                        _uiState.update {
+                            it.copy(
+                                subtitleCorrection = com.aicreatorstudio.app.ai.subtitle.correction
+                                    .AiCorrectionState.Applied(changed = 0, retimed = 0)
+                            )
+                        }
+                    }
+                    else -> {
+                        _uiState.update {
+                            it.copy(
+                                subtitleCorrection = com.aicreatorstudio.app.ai.subtitle.correction
+                                    .AiCorrectionState.Review(preview)
+                            )
+                        }
+                    }
+                }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                _uiState.update {
+                    it.copy(
+                        subtitleCorrection = com.aicreatorstudio.app.ai.subtitle.correction
+                            .AiCorrectionState.Idle
+                    )
+                }
+                throw e
+            } catch (e: Exception) {
+                android.util.Log.w(TAG_SUBS, "subtitle correction failed", e)
+                omeletLog.error(
+                    component = "ai_subtitle",
+                    event = "correction_failed",
+                    message = e.message ?: e::class.java.simpleName
+                )
+                _uiState.update {
+                    it.copy(
+                        subtitleCorrection = com.aicreatorstudio.app.ai.subtitle.correction
+                            .AiCorrectionState.Error(
+                                message = SubtitleMessages.subtitleError(
+                                    e.message ?: e::class.java.simpleName
+                                ),
+                                kind = com.aicreatorstudio.app.ai.subtitle.correction
+                                    .CorrectionFailureKind.UNKNOWN,
+                                retryable = true
+                            )
+                    )
+                }
+            }
+        }
+    }
+
+    /** Abort an in-flight correction. No-op when nothing is running. */
+    fun cancelSubtitleCorrection() {
+        val job = subtitleCorrectionJob ?: return
+        job.cancel()
+        subtitleCorrectionJob = null
+        _uiState.update {
+            it.copy(
+                subtitleCorrection = com.aicreatorstudio.app.ai.subtitle.correction
+                    .AiCorrectionState.Idle
+            )
+        }
+    }
+
+    /**
+     * Commit the reviewed corrections.
+     *
+     * The ONE place the correction stage writes to the project. Pushes
+     * history first, so the whole pass is a single undoable step, then
+     * persists — the same push/update/persist sequence every other
+     * text edit in this class follows.
+     *
+     * Only `text` (and, when the word count changed, the karaoke spans
+     * inside the segment's own window) changes. Timings, ids, styles
+     * and templates are carried by `copy`.
+     */
+    fun acceptSubtitleCorrection() {
+        val state = _uiState.value.subtitleCorrection
+        val preview = (state as? AiCorrectionState.Review)?.preview ?: return
+        if (preview.items.isEmpty()) {
+            rejectSubtitleCorrection()
+            return
+        }
+
+        val corrections = preview.items.associate { it.overlayId to it.corrected }
+        val applied = com.aicreatorstudio.app.ai.subtitle.correction
+            .CorrectionApplier.apply(_uiState.value.textOverlays, corrections)
+        if (applied.changed == 0) {
+            rejectSubtitleCorrection()
+            return
+        }
+
+        historyDelegate.push()
+        _uiState.update {
+            it.copy(
+                textOverlays = applied.overlays,
+                subtitleCorrection = com.aicreatorstudio.app.ai.subtitle.correction
+                    .AiCorrectionState.Applied(
+                        changed = applied.changed,
+                        retimed = applied.retimed
+                    )
+            )
+        }
+        persistProjectMeta()
+    }
+
+    /**
+     * Discard the preview. Writes nothing — the original transcription
+     * is exactly as it was.
+     */
+    fun rejectSubtitleCorrection() {
+        _uiState.update {
+            it.copy(
+                subtitleCorrection = com.aicreatorstudio.app.ai.subtitle.correction
+                    .AiCorrectionState.Idle
+            )
+        }
+    }
+
     /**
      * Delete every AI-generated subtitle overlay (subtitleSource ==
      * "ai", plus the in-memory id set for pre-anchor projects).
@@ -5525,13 +5855,26 @@ class EditorViewModel @Inject constructor(
         // export keeps working after a project save/reopen (the
         // in-memory `srtImportedOverlayIds` set is otherwise
         // empty on a fresh launch).
-        val overlays = _uiState.value.textOverlays.filter { overlay ->
-            overlay.id in aiSubtitleOverlayIds ||
-                overlay.subtitleSource == "ai" ||
-                overlay.subtitleSource == "srt"
-        }
+        //
+        // 2026-10-31 FIX — this filter used to be written out by
+        // hand (`id in aiSubtitleOverlayIds || subtitleSource in
+        // {"ai","srt"}`) and was NARROWER than the definition the
+        // Subs lane and every subtitle-style tool use: a caption
+        // that carries word timings but has no `subtitleSource`
+        // tag (any project authored before the tag existed, and
+        // every caption created by a path that forgets to stamp
+        // it) matched the lane but not the export. The button
+        // looked enabled and produced nothing but a bogus "no
+        // transcribable audio" banner. Now both sides call
+        // [isSubtitleOverlay], which delegates to the shared
+        // `TextOverlay.isSubtitle`.
+        val overlays = _uiState.value.textOverlays.filter { isSubtitleOverlay(it) }
         if (overlays.isEmpty()) {
-            _uiState.update { it.copy(errorMessage = SubtitleMessages.NO_SPEECH_FOUND_FA) }
+            // 2026-10-31 — a dedicated message. The old text
+            // ("no transcribable audio found in this video") was
+            // about GENERATION, so an export that had nothing to
+            // write reported a completely unrelated cause.
+            _uiState.update { it.copy(errorMessage = SubtitleMessages.NO_SUBTITLES_TO_EXPORT_FA) }
             return
         }
         // 2026-09-07 TIMEBASE FIX � every subtitle overlay now carries
@@ -5759,7 +6102,15 @@ class EditorViewModel @Inject constructor(
                     stream.write(body.toByteArray(Charsets.UTF_8))
                     stream.flush()
                 } ?: run {
-                    _uiState.update { it.copy(errorMessage = SubtitleMessages.NO_SPEECH_FOUND_FA) }
+                    // 2026-10-31 — the provider refused to open the
+                    // destination. This used to report
+                    // `NO_SPEECH_FOUND_FA` ("no transcribable audio"),
+                    // a cause that has nothing to do with writing a
+                    // file, so a failed save was indistinguishable
+                    // from an empty export.
+                    _uiState.update {
+                        it.copy(errorMessage = SubtitleMessages.srtExportFailed(SubtitleMessages.SRT_DESTINATION_UNAVAILABLE_FA))
+                    }
                     return@launch
                 }
             } catch (e: Exception) {

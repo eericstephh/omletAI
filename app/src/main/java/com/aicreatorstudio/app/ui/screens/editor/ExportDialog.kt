@@ -55,6 +55,10 @@ import com.aicreatorstudio.app.export.ExportStage
 import com.aicreatorstudio.app.export.ExportState
 import com.aicreatorstudio.app.ui.components.GlassMaterial
 import com.aicreatorstudio.app.ui.components.GlassSurface
+import com.aicreatorstudio.app.ui.theme.accentBright
+import com.aicreatorstudio.app.ui.theme.accentDeep
+import com.aicreatorstudio.app.ui.theme.accentPrimary
+import com.aicreatorstudio.app.ui.theme.glowBrand
 import com.aicreatorstudio.app.ui.theme.BorderSubtle
 import com.aicreatorstudio.app.ui.theme.CinematicElevated
 import com.aicreatorstudio.app.ui.theme.CinematicHighest
@@ -191,7 +195,7 @@ private fun QualityPickerDialog(
             Text(
                 text = "خروجی ویدئو",
                 style = MaterialTheme.typography.labelSmall,
-                color = iOSBlueBright,
+                color = accentBright(),
                 fontWeight = FontWeight.SemiBold
             )
             Spacer(Modifier.height(3.dp))
@@ -307,12 +311,12 @@ private fun QualityRow(
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
             .background(
-                if (selected) iOSBlue.copy(alpha = 0.18f)
+                if (selected) accentPrimary().copy(alpha = 0.18f)
                 else HairlineSubtle
             )
             .border(
                 1.dp,
-                if (selected) iOSBlue.copy(alpha = 0.45f) else Hairline,
+                if (selected) accentPrimary().copy(alpha = 0.45f) else Hairline,
                 RoundedCornerShape(10.dp)
             )
             .selectable(
@@ -329,7 +333,7 @@ private fun QualityRow(
                 .clip(RoundedCornerShape(percent = 50))
                 .border(
                     width = 1.5.dp,
-                    color = if (selected) iOSBlue else BorderSubtle,
+                    color = if (selected) accentPrimary() else BorderSubtle,
                     shape = RoundedCornerShape(percent = 50)
                 ),
             contentAlignment = Alignment.Center
@@ -339,7 +343,7 @@ private fun QualityRow(
                     modifier = Modifier
                         .size(12.dp)
                         .clip(RoundedCornerShape(percent = 50))
-                        .background(iOSBlue)
+                        .background(accentPrimary())
                 )
             }
         }
@@ -353,7 +357,7 @@ private fun QualityRow(
                 // the selected label matches how the subtitle template
                 // picker marks its selection, so "selected" reads the same
                 // everywhere in the app.
-                color = if (selected) iOSBlueBright else LabelPrimary,
+                color = if (selected) accentBright() else LabelPrimary,
                 style = MaterialTheme.typography.bodyMedium,
                 fontWeight = FontWeight.SemiBold
             )
@@ -396,7 +400,7 @@ private fun ProgressDialog(
                 Text(
                     text = "در حال خروجی گرفتن",
                     style = MaterialTheme.typography.labelSmall,
-                    color = iOSBlueBright,
+                    color = accentBright(),
                     fontWeight = FontWeight.SemiBold
                 )
                 Text(
@@ -421,7 +425,7 @@ private fun ProgressDialog(
                         .clip(RoundedCornerShape(percent = 50))
                         .background(
                             Brush.horizontalGradient(
-                                listOf(iOSBlue, iOSBlueBright)
+                                listOf(accentPrimary(), accentBright())
                             )
                         )
                 )
@@ -645,11 +649,11 @@ private fun iOSDialogButton(
     modifier: Modifier = Modifier
 ) {
     val brush = when (style) {
-        // 2026-10-16 (Phase 2) — was a horizontal iOSBlue → iOSBlueBright
+        // 2026-10-16 (Phase 2) — was a horizontal accentPrimary() → accentBright()
         // gradient under WHITE text. Measured: white on #8B5CF6 is 4.0:1 and
         // white on #A78BFA is 2.7:1, so the primary button of EVERY export
         // dialog failed WCAG AA. [ctaBrush] is the project's sanctioned
-        // white-text gradient (AccentDeep → AccentCtaBottom; white measures
+        // white-text gradient (accentDeep() → AccentCtaBottom; white measures
         // 5.7:1 → 7.1:1) and is already the toolbar Export pill's fill, so
         // the dialog CTA now matches the control that opened it.
         iOSDialogButtonStyle.Filled -> ctaBrush()

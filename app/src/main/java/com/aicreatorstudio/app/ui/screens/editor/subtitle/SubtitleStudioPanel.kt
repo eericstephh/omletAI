@@ -73,6 +73,10 @@ import com.aicreatorstudio.app.model.template.ShadowOverride
 import com.aicreatorstudio.app.model.withTemplate
 import com.aicreatorstudio.app.ui.components.EmptyState
 import com.aicreatorstudio.app.ui.screens.editor.toFontFamily
+import com.aicreatorstudio.app.ui.theme.accentBright
+import com.aicreatorstudio.app.ui.theme.accentDeep
+import com.aicreatorstudio.app.ui.theme.accentPrimary
+import com.aicreatorstudio.app.ui.theme.glowBrand
 import com.aicreatorstudio.app.ui.theme.BorderSubtle
 import com.aicreatorstudio.app.ui.theme.CinematicElevated
 import com.aicreatorstudio.app.ui.theme.Hairline
@@ -264,12 +268,12 @@ fun SubtitleStudioPanel(
                         .heightIn(min = 40.dp)
                         .clip(RoundedCornerShape(10.dp))
                         .background(
-                            if (activeTab == i) iOSBlue.copy(alpha = 0.22f)
+                            if (activeTab == i) accentPrimary().copy(alpha = 0.22f)
                             else Color.White.copy(alpha = 0.05f)
                         )
                         .border(
                             1.dp,
-                            if (activeTab == i) iOSBlueBright else HairlineSubtle,
+                            if (activeTab == i) accentBright() else HairlineSubtle,
                             RoundedCornerShape(10.dp)
                         )
                         .clickable { activeTab = i }
@@ -283,7 +287,7 @@ fun SubtitleStudioPanel(
                 ) {
                     Text(
                         text = label,
-                        color = if (activeTab == i) iOSBlueBright else LabelSecondary,
+                        color = if (activeTab == i) accentBright() else LabelSecondary,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = if (activeTab == i) FontWeight.Bold else FontWeight.Medium,
                         maxLines = 1
@@ -302,7 +306,7 @@ fun SubtitleStudioPanel(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
                     .background(SurfaceSunken)
-                    .border(1.dp, iOSBlue.copy(alpha = 0.25f), RoundedCornerShape(14.dp))
+                    .border(1.dp, accentPrimary().copy(alpha = 0.25f), RoundedCornerShape(14.dp))
                     .padding(vertical = 12.dp, horizontal = 14.dp)
             )
         }
@@ -501,12 +505,12 @@ fun SubtitleStudioPanel(
                             modifier = Modifier
                                 .clip(iOSShapes.capsule)
                                 .background(
-                                    if (selected) iOSBlue.copy(alpha = 0.22f)
+                                    if (selected) accentPrimary().copy(alpha = 0.22f)
                                     else Color.White.copy(alpha = 0.05f)
                                 )
                                 .border(
                                     1.dp,
-                                    if (selected) iOSBlueBright else HairlineSubtle,
+                                    if (selected) accentBright() else HairlineSubtle,
                                     iOSShapes.capsule
                                 )
                                 .clickable { applyFont(FontOverride(family = f.name)) }
@@ -514,7 +518,7 @@ fun SubtitleStudioPanel(
                         ) {
                             Text(
                                 text = f.displayName,
-                                color = if (selected) iOSBlueBright else LabelSecondary,
+                                color = if (selected) accentBright() else LabelSecondary,
                                 style = MaterialTheme.typography.labelMedium,
                                 fontFamily = f.toFontFamily(),
                                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
@@ -545,12 +549,12 @@ fun SubtitleStudioPanel(
                             modifier = Modifier
                                 .clip(iOSShapes.capsule)
                                 .background(
-                                    if (selected) iOSBlue.copy(alpha = 0.22f)
+                                    if (selected) accentPrimary().copy(alpha = 0.22f)
                                     else Color.White.copy(alpha = 0.05f)
                                 )
                                 .border(
                                     1.dp,
-                                    if (selected) iOSBlueBright else HairlineSubtle,
+                                    if (selected) accentBright() else HairlineSubtle,
                                     iOSShapes.capsule
                                 )
                                 .clickable { applyFont(FontOverride(family = f.name)) }
@@ -558,7 +562,7 @@ fun SubtitleStudioPanel(
                         ) {
                             Text(
                                 text = f.displayName,
-                                color = if (selected) iOSBlueBright else LabelSecondary,
+                                color = if (selected) accentBright() else LabelSecondary,
                                 style = MaterialTheme.typography.labelMedium,
                                 fontFamily = f.toFontFamily()
                             )
@@ -674,7 +678,7 @@ fun SubtitleStudioPanel(
                                 .background(Color(color))
                                 .border(
                                     2.dp,
-                                    if (isSelected) iOSBlueBright else Color.Transparent,
+                                    if (isSelected) accentBright() else Color.Transparent,
                                     iOSShapes.capsule
                                 )
                                 .clickable {
@@ -705,7 +709,7 @@ fun SubtitleStudioPanel(
                 Box(
                     modifier = Modifier
                         .clip(iOSShapes.capsule)
-                        .background(iOSBlue.copy(alpha = 0.18f))
+                        .background(accentPrimary().copy(alpha = 0.18f))
                         .clickable {
                             val hex = hexInput.trim().let { if (it.startsWith("#")) it else "#$it" }
                             if (hex.length == 7) {
@@ -715,7 +719,7 @@ fun SubtitleStudioPanel(
                         }
                         .padding(horizontal = 14.dp, vertical = 8.dp),
                     contentAlignment = Alignment.Center
-                ) { Text(text = "اعمال رنگ", color = iOSBlueBright, style = MaterialTheme.typography.labelSmall) }
+                ) { Text(text = "اعمال رنگ", color = accentBright(), style = MaterialTheme.typography.labelSmall) }
                 // Reset button
                 Box(
                     modifier = Modifier
@@ -774,12 +778,12 @@ fun SubtitleStudioPanel(
                             modifier = Modifier
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(
-                                    if (selected) iOSBlue.copy(alpha = 0.18f)
+                                    if (selected) accentPrimary().copy(alpha = 0.18f)
                                     else Color.White.copy(alpha = 0.05f)
                                 )
                                 .border(
                                     1.dp,
-                                    if (selected) iOSBlueBright else HairlineSubtle,
+                                    if (selected) accentBright() else HairlineSubtle,
                                     RoundedCornerShape(10.dp)
                                 )
                                 .clickable { applyShadow(ShadowOverride(type = type)) }
@@ -788,7 +792,7 @@ fun SubtitleStudioPanel(
                             Column {
                                 Text(
                                     text = label,
-                                    color = if (selected) iOSBlueBright else LabelPrimary,
+                                    color = if (selected) accentBright() else LabelPrimary,
                                     style = MaterialTheme.typography.labelMedium,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
                                 )
@@ -914,7 +918,7 @@ fun SubtitleStudioPanel(
                                         .clip(RoundedCornerShape(10.dp))
                                         .background(
                                             when {
-                                                isSelected -> iOSBlue.copy(alpha = 0.18f)
+                                                isSelected -> accentPrimary().copy(alpha = 0.18f)
                                                 inDanger -> StatusError.copy(alpha = 0.08f)
                                                 else -> Color.White.copy(alpha = 0.05f)
                                             }
@@ -922,7 +926,7 @@ fun SubtitleStudioPanel(
                                         .border(
                                             1.dp,
                                             when {
-                                                isSelected -> iOSBlueBright
+                                                isSelected -> accentBright()
                                                 inDanger -> StatusError.copy(alpha = 0.4f)
                                                 else -> HairlineSubtle
                                             },
@@ -940,7 +944,7 @@ fun SubtitleStudioPanel(
                                     Text(
                                         text = label,
                                         color = when {
-                                            isSelected -> iOSBlueBright
+                                            isSelected -> accentBright()
                                             inDanger -> StatusError
                                             else -> LabelSecondary
                                         },
@@ -1041,7 +1045,7 @@ fun SubtitleStudioPanel(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(
-                                    if (selected) iOSBlue.copy(alpha = 0.16f)
+                                    if (selected) accentPrimary().copy(alpha = 0.16f)
                                     else Color.White.copy(alpha = 0.04f)
                                 )
                                 .clickable {
@@ -1052,7 +1056,7 @@ fun SubtitleStudioPanel(
                         ) {
                             Text(
                                 text = kind.displayName,
-                                color = if (selected) iOSBlueBright else LabelPrimary,
+                                color = if (selected) accentBright() else LabelPrimary,
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
                             )
@@ -1297,7 +1301,7 @@ fun SubtitleStudioPanel(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(
-                                    if (selected) iOSBlue.copy(alpha = 0.16f)
+                                    if (selected) accentPrimary().copy(alpha = 0.16f)
                                     else Color.White.copy(alpha = 0.04f)
                                 )
                                 .clickable {
@@ -1309,7 +1313,7 @@ fun SubtitleStudioPanel(
                         ) {
                             Text(
                                 text = label,
-                                color = if (selected) iOSBlueBright else LabelPrimary,
+                                color = if (selected) accentBright() else LabelPrimary,
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
                             )
@@ -1468,7 +1472,7 @@ fun SubtitleStudioPanel(
                                 .fillMaxWidth()
                                 .clip(RoundedCornerShape(10.dp))
                                 .background(
-                                    if (selected) iOSBlue.copy(alpha = 0.16f)
+                                    if (selected) accentPrimary().copy(alpha = 0.16f)
                                     else Color.White.copy(alpha = 0.04f)
                                 )
                                 .clickable {
@@ -1478,7 +1482,7 @@ fun SubtitleStudioPanel(
                         ) {
                             Text(
                                 text = label,
-                                color = if (selected) iOSBlueBright else LabelPrimary,
+                                color = if (selected) accentBright() else LabelPrimary,
                                 style = MaterialTheme.typography.labelMedium,
                                 fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium
                             )
@@ -1617,9 +1621,9 @@ fun SubtitleStudioPanel(
                 modifier = Modifier
                     .clip(iOSShapes.capsule)
                     // 2026-10-17 PHASE 3 — white text on the
-                    // iOSBlue→iOSBlueBright gradient measured 2.72:1, a WCAG AA
+                    // accentPrimary()→accentBright() gradient measured 2.72:1, a WCAG AA
                     // failure (the ExportDialog CTA had the identical bug, fixed
-                    // in Phase 2). `ctaBrush()` (AccentDeep→AccentCtaBottom)
+                    // in Phase 2). `ctaBrush()` (accentDeep()→AccentCtaBottom)
                     // reaches 7.1:1 and matches the editor's other primary CTAs.
                     // The disabled form is now a proper quiet surface rather
                     // than the same gradient with a dead tap target.
@@ -1671,7 +1675,7 @@ fun SubtitleStudioPanel(
                 .clip(iOSShapes.capsule)
                 .background(
                     if (hasGeneratedSubtitles)
-                        Brush.horizontalGradient(listOf(iOSBlue, iOSBlueBright))
+                        Brush.horizontalGradient(listOf(accentPrimary(), accentBright()))
                     else Brush.horizontalGradient(listOf(Color.Gray, Color.Gray))
                 )
                 .clickable(enabled = hasGeneratedSubtitles) {
@@ -1742,7 +1746,7 @@ fun SubtitleStudioPanel(
                 .fillMaxWidth()
                 .clip(iOSShapes.capsule)
                 .background(
-                    Brush.horizontalGradient(listOf(iOSBlueBright, iOSBlue))
+                    Brush.horizontalGradient(listOf(accentBright(), accentPrimary()))
                 )
                 .clickable {
                     val start = startText.trim().toDoubleOrNull()
@@ -1937,14 +1941,14 @@ private fun SubtitleEditingSection(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(8.dp))
                         .background(
-                            if (isActive) iOSBlue.copy(alpha = 0.16f)
+                            if (isActive) accentPrimary().copy(alpha = 0.16f)
                             else Color.Transparent
                         )
                         .padding(horizontal = 6.dp, vertical = 4.dp)
                 ) {
                     Text(
                         text = w.text,
-                        color = if (isActive) iOSBlueBright else LabelPrimary,
+                        color = if (isActive) accentBright() else LabelPrimary,
                         style = MaterialTheme.typography.labelSmall,
                         fontWeight = if (isActive) FontWeight.Bold else FontWeight.Normal,
                         maxLines = 1,
@@ -1991,17 +1995,17 @@ private fun StudioActionChip(
         modifier = modifier
             .clip(iOSShapes.capsule)
             .background(
-                if (enabled) iOSBlue.copy(alpha = 0.22f)
+                if (enabled) accentPrimary().copy(alpha = 0.22f)
                 else Color.White.copy(alpha = 0.04f)
             )
-            .border(1.dp, if (enabled) iOSBlueBright else HairlineSubtle, iOSShapes.capsule)
+            .border(1.dp, if (enabled) accentBright() else HairlineSubtle, iOSShapes.capsule)
             .clickable(enabled = enabled) { onClick() }
             .padding(horizontal = 10.dp, vertical = 7.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = label,
-            color = if (enabled) iOSBlueBright else LabelSecondary,
+            color = if (enabled) accentBright() else LabelSecondary,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
@@ -2206,12 +2210,12 @@ private fun TemplateGridCard(
             // so an unselected card had almost no edge. Fill/border now use
             // the two white-film tokens at their intended roles.
             .background(
-                if (selected) iOSBlue.copy(alpha = 0.16f)
+                if (selected) accentPrimary().copy(alpha = 0.16f)
                 else HairlineSubtle
             )
             .border(
                 1.dp,
-                if (selected) iOSBlueBright else Hairline,
+                if (selected) accentBright() else Hairline,
                 RoundedCornerShape(12.dp)
             )
             .clickable(role = Role.Button) { onClick() }
@@ -2257,7 +2261,7 @@ private fun TemplateGridCard(
         }
         Text(
             text = template.name,
-            color = if (selected) iOSBlueBright else LabelPrimary,
+            color = if (selected) accentBright() else LabelPrimary,
             style = MaterialTheme.typography.labelMedium,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.SemiBold,
             maxLines = 1,
@@ -2293,12 +2297,12 @@ private fun ModeChip(label: String, selected: Boolean, onClick: () -> Unit) {
             .heightIn(min = 36.dp)
             .clip(iOSShapes.capsule)
             .background(
-                if (selected) iOSBlue.copy(alpha = 0.22f)
+                if (selected) accentPrimary().copy(alpha = 0.22f)
                 else HairlineSubtle
             )
             .border(
                 1.dp,
-                if (selected) iOSBlueBright else Hairline,
+                if (selected) accentBright() else Hairline,
                 iOSShapes.capsule
             )
             .clickable(role = Role.Button) { onClick() }
@@ -2312,7 +2316,7 @@ private fun ModeChip(label: String, selected: Boolean, onClick: () -> Unit) {
     ) {
         Text(
             text = label,
-            color = if (selected) iOSBlueBright else LabelSecondary,
+            color = if (selected) accentBright() else LabelSecondary,
             style = MaterialTheme.typography.labelSmall,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
             maxLines = 1
@@ -2352,7 +2356,7 @@ private fun SliderRow(
         ) {
             Text(
                 text = valueLabel,
-                color = iOSBlueBright,
+                color = accentBright(),
                 style = MaterialTheme.typography.labelSmall,
                 fontWeight = FontWeight.Bold
             )
@@ -2437,7 +2441,7 @@ private fun GlobalSubtitleSizeControl(
             ) {
                 Text(
                     text = "${sizeSp.toInt()}sp",
-                    color = iOSBlueBright,
+                    color = accentBright(),
                     style = MaterialTheme.typography.labelSmall,
                     fontWeight = FontWeight.Bold
                 )
@@ -2493,15 +2497,15 @@ private fun GlobalSubtitleSizeControl(
             Box(
                 modifier = Modifier
                     .clip(iOSShapes.capsule)
-                    .background(iOSBlue.copy(alpha = 0.22f))
-                    .border(1.dp, iOSBlueBright, iOSShapes.capsule)
+                    .background(accentPrimary().copy(alpha = 0.22f))
+                    .border(1.dp, accentBright(), iOSShapes.capsule)
                     .clickable { onDiscreteSize(sizeSp) }
                     .padding(horizontal = 14.dp, vertical = 7.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = "اعمال روی تمام زیرنویس‌ها",
-                    color = iOSBlueBright,
+                    color = accentBright(),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.Bold
                 )

@@ -36,54 +36,26 @@ object AppChangelogProvider {
 
     /**
      * Every release we want the user to be able to look back at, newest
-     * first. Kept to the last handful of releases — this is a "what's new"
-     * surface, not a full product history.
+     * first.
+     *
+     * 2026-11-01 — the history was deliberately **wiped** for the store
+     * release «1.1»: the 1.1.0–1.4.0 entries described a dev line that was
+     * never published under those names, so the bell now opens on exactly
+     * one card describing what THIS release ships. Future releases prepend
+     * above it, per "Adding a release" in the class KDoc.
      */
     val releases: List<AppReleaseNote> = listOf(
         AppReleaseNote(
-            versionCode = 4,
-            versionName = "1.4.0",
-            releaseDate = "۸ مهر ۱۴۰۵",
+            versionCode = 5,
+            versionName = "1.1",
+            releaseDate = "۱۰ آبان ۱۴۰۵",
             isCurrent = true,
             features = listOf(
-                "اضافه شدن ردیابی حرکت سوژه (Motion Tracking) با متن و استیکر متحرک",
-                "منحنی تغییر سرعت پیشرفته (Speed Ramping / Curves) با ۵ پریست آماده هالیوودی",
-                "بهبود خودکار ابعاد و کادر برای ویدیوهای افقی و عمودی",
-                "بهینه‌سازی نوار ابزار هوشمند ویرایشگر ویدیو",
-                "افزودن زنگوله اطلاع‌رسانی تغییرات و آپدیت‌های جدید"
-            )
-        ),
-        AppReleaseNote(
-            versionCode = 3,
-            versionName = "1.3.0",
-            releaseDate = "۲۵ شهریور ۱۴۰۵",
-            features = listOf(
-                "زیرنویس فارسی هوشمند با استودیوی قالب و کلمات هم‌زمان (Karaoke)",
-                "حذف پس‌زمینه ویدیو (Background Remove) با موتور ماتینگ داخلی",
-                "بهبود کیفیت ویدیو با آپ‌اسکیلر هوشمند (Smart HD / 4K)",
-                "پاک‌سازی صدا و حذف نویز گفتار (Voice Clean)"
-            )
-        ),
-        AppReleaseNote(
-            versionCode = 2,
-            versionName = "1.2.0",
-            releaseDate = "۱۰ شهریور ۱۴۰۵",
-            features = listOf(
-                "پنل‌های رنگ و نور حرفه‌ای (Lumetri) با محدوده رنگ زنده",
-                "افکت‌های سینمایی آماده و پریست‌های فیلتر یک‌کلیکی",
-                "مدیریت صدا: ولوم، محو شدن تدریجی و میکس خودکار",
-                "کنترل سرعت ثابت کلیپ با حفظ هم‌زمانی صدا"
-            )
-        ),
-        AppReleaseNote(
-            versionCode = 1,
-            versionName = "1.1.0",
-            releaseDate = "۲۸ مرداد ۱۴۰۵",
-            features = listOf(
-                "ویرایشگر تایم‌لاین چندلایه با درگ، تریم و جابه‌جایی کلیپ",
-                "انتقال‌های سینمایی (Transitions) بین کلیپ‌ها",
-                "متن و استیکر روی ویدیو با درگ لمسی زنده",
-                "خروجی سریع با کیفیت ۷۲۰p، ۱۰۸۰p و ۴K"
+                "اصلاح هوشمند املای زیرنویس فارسی با هوش مصنوعی، همراه با پیش‌نمایش و تأیید پیش از اعمال",
+                "آموزش اولیه و تور راهنمای صفحهٔ اصلی برای آشنایی سریع با محیط و قابلیت‌ها",
+                "امکان نمایش دوبارهٔ آموزش‌ها از بخش «تنظیمات ← آموزش و راهنما»",
+                "۱۲ ابزار هوش مصنوعی در ویرایشگر: زیرنویس هوشمند، حذف پس‌زمینه، متن‌یابی، افزایش کیفیت، برش سکوت و سینک ضرب",
+                "بهبود پایداری پردازش ویدیو و رفع مشکلات خروجی زیرنویس"
             )
         )
     )
@@ -105,8 +77,8 @@ object AppChangelogProvider {
      *
      * The debug build type appends `-debug` (`versionNameSuffix` in
      * `app/build.gradle.kts`), which is build metadata rather than a version
-     * difference, so it is stripped: a debug install of 1.4.0 should read
-     * "نسخه جاری 1.4.0", not "1.4.0-debug".
+     * difference, so it is stripped: a debug install of 1.1 should read
+     * "نسخه جاری 1.1", not "1.1-debug".
      */
     val currentVersionName: String get() = BuildConfig.VERSION_NAME.substringBefore('-')
 }

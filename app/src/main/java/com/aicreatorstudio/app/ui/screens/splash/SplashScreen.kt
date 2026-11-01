@@ -43,6 +43,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.aicreatorstudio.app.R
 import com.aicreatorstudio.app.ui.components.t
+import com.aicreatorstudio.app.ui.theme.accentBright
+import com.aicreatorstudio.app.ui.theme.accentDeep
+import com.aicreatorstudio.app.ui.theme.accentPrimary
+import com.aicreatorstudio.app.ui.theme.glowBrand
 import com.aicreatorstudio.app.ui.theme.AccentBright
 import com.aicreatorstudio.app.ui.theme.LabelPrimary
 import com.aicreatorstudio.app.ui.theme.LocalMotionEnabled
@@ -172,7 +176,7 @@ fun SplashScreen(
                         .background(
                             Brush.radialGradient(
                                 listOf(
-                                    AccentBright.copy(alpha = 0.35f),
+                                    accentBright().copy(alpha = 0.35f),
                                     Color.Transparent
                                 ),
                                 radius = 320f
@@ -244,7 +248,7 @@ private fun Wordmark() {
             text = "AI",
             fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
-            color = AccentBright,
+            color = accentBright(),
             modifier = Modifier.padding(bottom = 6.dp)
         )
     }

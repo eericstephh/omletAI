@@ -73,7 +73,7 @@ class MainActivity : ComponentActivity() {
             val settingsViewModel: SettingsViewModel = hiltViewModel()
             val settings by settingsViewModel.settings.collectAsState()
 
-            AICreatorStudioTheme(themeMode = settings.themeMode) {
+            AICreatorStudioTheme(theme = settings.theme) {
                 Surface(modifier = Modifier.fillMaxSize()) {
                     val navController = rememberNavController()
                     AppNavGraph(navController = navController)

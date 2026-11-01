@@ -62,6 +62,10 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.aicreatorstudio.app.model.ImportVideoUiState
 import com.aicreatorstudio.app.model.VideoClip
 import com.aicreatorstudio.app.ui.components.t
+import com.aicreatorstudio.app.ui.theme.accentBright
+import com.aicreatorstudio.app.ui.theme.accentDeep
+import com.aicreatorstudio.app.ui.theme.accentPrimary
+import com.aicreatorstudio.app.ui.theme.glowBrand
 import com.aicreatorstudio.app.ui.theme.AccentBright
 import com.aicreatorstudio.app.ui.theme.BorderSubtle
 import com.aicreatorstudio.app.ui.theme.CinematicBlack
@@ -261,7 +265,7 @@ private fun InitialState(onSelectVideoClick: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        IconTile(icon = Icons.Filled.VideoFile, tint = AccentBright)
+        IconTile(icon = Icons.Filled.VideoFile, tint = accentBright())
         Text(
             text = t("یک ویدیو از دستگاه خود انتخاب کنید"),
             style = MaterialTheme.typography.titleMedium,
@@ -284,7 +288,7 @@ private fun LoadingState() {
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        CircularProgressIndicator(color = AccentBright)
+        CircularProgressIndicator(color = accentBright())
         Text(
             text = t("در حال خواندن اطلاعات ویدیو…"),
             style = MaterialTheme.typography.bodyLarge,

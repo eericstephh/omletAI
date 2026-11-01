@@ -400,21 +400,15 @@ private fun AppUpdateSheetContentPreview() {
         val persianFamily = remember { PersianFont.VAZIR.toFontFamily() }
         val sample = listOf(
             AppReleaseNote(
-                versionCode = 4,
-                versionName = "1.4.0",
-                releaseDate = "۸ مهر ۱۴۰۵",
+                versionCode = 5,
+                versionName = "1.1",
+                releaseDate = "۱۰ آبان ۱۴۰۵",
                 isCurrent = true,
                 features = listOf(
-                    "اضافه شدن ردیابی حرکت سوژه (Motion Tracking) با متن و استیکر متحرک",
-                    "منحنی تغییر سرعت پیشرفته (Speed Ramping / Curves) با ۵ پریست آماده هالیوودی",
-                    "بهبود خودکار ابعاد و کادر برای ویدیوهای افقی و عمودی"
+                    "اصلاح هوشمند املای زیرنویس فارسی با هوش مصنوعی، همراه با پیش‌نمایش و تأیید پیش از اعمال",
+                    "آموزش اولیه و تور راهنمای صفحهٔ اصلی برای آشنایی سریع با محیط و قابلیت‌ها",
+                    "۱۲ ابزار هوش مصنوعی در ویرایشگر: زیرنویس هوشمند، حذف پس‌زمینه، متن‌یابی و افزایش کیفیت"
                 )
-            ),
-            AppReleaseNote(
-                versionCode = 3,
-                versionName = "1.3.0",
-                releaseDate = "۲۵ شهریور ۱۴۰۵",
-                features = listOf("زیرنویس فارسی هوشمند با استودیوی قالب")
             )
         )
         CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
@@ -425,7 +419,7 @@ private fun AppUpdateSheetContentPreview() {
                     .padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                SheetHeader(currentVersionName = "1.4.0", persianFamily = persianFamily)
+                SheetHeader(currentVersionName = "1.1", persianFamily = persianFamily)
                 sample.forEach { ReleaseCard(it, persianFamily) }
                 SheetFooter(onGotIt = {}, persianFamily = persianFamily)
             }

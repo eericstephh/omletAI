@@ -22,11 +22,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Brightness6
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CloudDownload
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.HdrStrong
 import androidx.compose.material.icons.filled.LightMode
+import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Smartphone
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material3.Card
@@ -51,6 +54,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
@@ -58,11 +63,15 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.aicreatorstudio.app.R
 import com.aicreatorstudio.app.settings.AppSettings
+import com.aicreatorstudio.app.settings.AppTheme
 import com.aicreatorstudio.app.ui.components.t
-import com.aicreatorstudio.app.settings.ThemeMode
 import com.aicreatorstudio.app.ui.theme.CinematicBlack
 import com.aicreatorstudio.app.ui.theme.LabelPrimary
+import com.aicreatorstudio.app.ui.theme.OceanAccents
+import com.aicreatorstudio.app.ui.theme.RoseAccents
+import com.aicreatorstudio.app.ui.theme.VioletAccents
 import com.aicreatorstudio.app.viewmodel.SettingsViewModel
+import com.aicreatorstudio.app.viewmodel.TutorialViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -179,9 +188,9 @@ fun SettingsScreen(
 
             item {
                 SettingsSection(title = t("ظاهر")) {
-                    ThemeModeSelector(
-                        selectedMode = settings.themeMode,
-                        onModeSelected = viewModel::updateThemeMode
+                    AppThemeSelector(
+                        selected = settings.theme,
+                        onSelected = viewModel::updateTheme
                     )
                 }
             }
@@ -245,6 +254,39 @@ fun SettingsScreen(
                     DefaultFontSelector(
                         currentFont = settings.defaultTextFont,
                         onFontSelected = viewModel::updateTextFont
+                    )
+                }
+            }
+
+            item { Spacer(modifier = Modifier.height(8.dp)) }
+
+            // 2026-11-01 — «آموزش و راهنما». The onboarding and the Home
+            // tour are one-time overlays; without an entry here a user who
+            // dismissed them (or who installed before they existed) could
+            // never see them again. Both rows write to TutorialPreferences,
+            // and the Home screen observes the same StateFlow — so going
+            // back re-opens the overlay immediately, with no navigation
+            // event and nothing to keep in sync.
+            item {
+                val tutorialVm: TutorialViewModel = hiltViewModel()
+                SettingsSection(title = t("آموزش و راهنما")) {
+                    SettingsActionItem(
+                        icon = Icons.Filled.School,
+                        title = t("نمایش دوبارهٔ آموزش اولیه"),
+                        subtitle = t("معرفی برنامه، زیرنویس فارسی و ابزارهای هوش مصنوعی"),
+                        onClick = { tutorialVm.replayAll() }
+                    )
+                    SettingsActionItem(
+                        icon = Icons.Filled.PlayCircle,
+                        title = t("نمایش دوبارهٔ تور صفحهٔ اصلی"),
+                        subtitle = t("راهنمای کوتاه بخش‌های همین صفحه"),
+                        onClick = { tutorialVm.replayHomeTour() }
+                    )
+                    Text(
+                        text = t("با بازگشت به صفحهٔ اصلی نمایش داده می‌شود."),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
                     )
                 }
             }
@@ -417,9 +459,13 @@ internal fun SettingsSection(
             modifier = Modifier.padding(bottom = 8.dp, top = 4.dp)
         )
         Card(
-            shape = RoundedCornerShape(16.dp),
+            // 2026-11-01 — card system refresh: larger radius and a more
+            // present fill, so a section reads as a card rather than as a
+            // faint tint on the background (same direction as the Home
+            // card refresh in `cardBrush`).
+            shape = RoundedCornerShape(20.dp),
             colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.66f)
             )
         ) {
             Column(modifier = Modifier.padding(vertical = 4.dp)) {
@@ -470,72 +516,152 @@ private fun SettingsToggleItem(
     }
 }
 
+/**
+ * A tappable settings row — the action counterpart of
+ * [SettingsToggleItem]: same geometry, no switch, a chevron-free
+ * "do this now" affordance.
+ *
+ * Used by «آموزش و راهنما», where both rows *perform* something
+ * (re-arm the tutorial) rather than *store* a value.
+ */
 @Composable
-private fun ThemeModeSelector(
-    selectedMode: ThemeMode,
-    onModeSelected: (ThemeMode) -> Unit
+private fun SettingsActionItem(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    onClick: () -> Unit
 ) {
     Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 16.dp, vertical = 12.dp)
     ) {
-        ThemeMode.entries.forEach { mode ->
-            val icon = when (mode) {
-                ThemeMode.DARK -> Icons.Filled.DarkMode
-                ThemeMode.LIGHT -> Icons.Filled.LightMode
-                ThemeMode.SYSTEM -> Icons.Filled.Brightness6
-            }
-            // 2026-10-17 PHASE 3 — these three labels were the last
-            // English chrome left on the Settings screen, in a
-            // Persian-default app. `label` is also reused as the icon's
-            // contentDescription, so localizing it fixes the accessible
-            // name too.
-            val label = when (mode) {
-                ThemeMode.DARK -> t("حالت تیره")
-                ThemeMode.LIGHT -> t("حالت روشن")
-                ThemeMode.SYSTEM -> t("سیستم")
-            }
-            val isSelected = mode == selectedMode
-            val containerColor by animateColorAsState(
-                if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.15f)
-                else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                label = "themeChipColor"
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.primary,
+            modifier = Modifier.size(22.dp)
+        )
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(text = title, style = MaterialTheme.typography.bodyLarge)
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            val borderColor by animateColorAsState(
-                if (isSelected) MaterialTheme.colorScheme.primary
-                else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
-                label = "themeBorderColor"
-            )
+        }
+    }
+}
 
-            Box(
+/**
+ * 2026-11-01 — the theme picker, rebuilt for the three selectable themes.
+ *
+ * The old control was three 56dp icon chips for dark/light/system. The new
+ * one is three **preview cards**: each shows the theme's actual CTA gradient
+ * as a swatch next to its name, so the user chooses from what they will GET
+ * rather than from an abstract word. The swatch renders the same deep→bottom
+ * brush the real buttons use, read from the same accent data — there is no
+ * second copy of the palette that could drift.
+ *
+ * Selection state follows the persisted [AppSettings.theme]; tapping writes
+ * it immediately (the whole app recomposes through the theme root, no
+ * restart needed).
+ */
+@Composable
+private fun AppThemeSelector(
+    selected: AppTheme,
+    onSelected: (AppTheme) -> Unit
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        AppTheme.entries.forEach { theme ->
+            val accents = when (theme) {
+                AppTheme.VIOLET_NIGHT -> VioletAccents
+                AppTheme.OCEAN -> OceanAccents
+                AppTheme.ROSE -> RoseAccents
+            }
+            val label = when (theme) {
+                AppTheme.VIOLET_NIGHT -> t("شب بنفش")
+                AppTheme.OCEAN -> t("اقیانوس")
+                AppTheme.ROSE -> t("غروب سرخ")
+            }
+            val isSelected = theme == selected
+            val shape = RoundedCornerShape(14.dp)
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .weight(1f)
-                    .height(56.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(containerColor)
-                    .border(1.dp, borderColor, RoundedCornerShape(12.dp))
-                    .clickable { onModeSelected(mode) },
-                contentAlignment = Alignment.Center
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = label,
-                        tint = if (isSelected) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.size(18.dp)
+                    .fillMaxWidth()
+                    .clip(shape)
+                    .background(
+                        if (isSelected) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                        else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    .border(
+                        1.dp,
+                        if (isSelected) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                        shape
+                    )
+                    .clickable { onSelected(theme) }
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+            ) {
+                // The swatch: the theme's real CTA gradient.
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(11.dp))
+                        .background(
+                            Brush.verticalGradient(listOf(accents.deep, accents.ctaBottom))
+                        )
+                        .border(
+                            1.dp,
+                            Brush.verticalGradient(
+                                listOf(Color.White.copy(alpha = 0.28f), Color.Transparent)
+                            ),
+                            shape
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (isSelected) {
+                        Icon(
+                            imageVector = Icons.Filled.Check,
+                            contentDescription = null,
+                            tint = Color.White,
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = label,
-                        style = MaterialTheme.typography.labelMedium,
-                        color = if (isSelected) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurfaceVariant
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
+                    )
+                    val description = when (theme) {
+                        AppTheme.VIOLET_NIGHT -> t("هویت پیش‌فرض؛ بنفش سینمایی")
+                        AppTheme.OCEAN -> t("آبی فیروزهای خنک و دقیق")
+                        AppTheme.ROSE -> t("گرم و پرانرژی، حال و هوای غروب")
+                    }
+                    Text(
+                        text = description,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (isSelected) {
+                    Text(
+                        text = t("فعال"),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }

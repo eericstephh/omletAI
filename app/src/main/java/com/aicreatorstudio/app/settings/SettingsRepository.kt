@@ -10,10 +10,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
-enum class ThemeMode { DARK, LIGHT, SYSTEM }
-
 data class AppSettings(
-    val themeMode: ThemeMode = ThemeMode.DARK,
+    val theme: AppTheme = AppTheme.VIOLET_NIGHT,
     val defaultExportQuality: String = "1080p",
     val autoSaveEnabled: Boolean = true,
     val snapToGrid: Boolean = true,
@@ -51,7 +49,14 @@ class SettingsRepository @Inject constructor(
 
     private fun loadSettings(): AppSettings {
         return AppSettings(
-            themeMode = ThemeMode.entries.getOrElse(prefs.getInt(KEY_THEME_MODE, 2)) { ThemeMode.DARK },
+            // 2026-11-01 — three selectable themes replace the old
+            // DARK/LIGHT/SYSTEM switch. Migration: the new key wins when
+            // present; a legacy install falls back to its ThemeMode
+            // ordinal, which maps to the brand dark theme regardless
+            // (LIGHT never had a real light rendering to preserve).
+            theme = prefs.getString(KEY_APP_THEME, null)
+                ?.let(AppTheme::fromKey)
+                ?: AppTheme.fromLegacyThemeModeOrdinal(prefs.getInt(KEY_THEME_MODE, 2)),
             defaultExportQuality = prefs.getString(KEY_EXPORT_QUALITY, "1080p") ?: "1080p",
             autoSaveEnabled = prefs.getBoolean(KEY_AUTO_SAVE, true),
             snapToGrid = prefs.getBoolean(KEY_SNAP_TO_GRID, true),
@@ -67,9 +72,14 @@ class SettingsRepository @Inject constructor(
         )
     }
 
-    fun updateThemeMode(mode: ThemeMode) {
-        prefs.edit().putInt(KEY_THEME_MODE, mode.ordinal).apply()
-        _settings.value = _settings.value.copy(themeMode = mode)
+    /**
+     * Persist the selected theme. The value is the [AppTheme.key]; the old
+     * `KEY_THEME_MODE` ordinal is left in place but no longer read once the
+     * new key exists, so a user can always go back by clearing the new key.
+     */
+    fun updateTheme(theme: AppTheme) {
+        prefs.edit().putString(KEY_APP_THEME, theme.key).apply()
+        _settings.value = _settings.value.copy(theme = theme)
     }
 
     fun updateExportQuality(quality: String) {
@@ -299,6 +309,8 @@ class SettingsRepository @Inject constructor(
 
     companion object {
         private const val KEY_THEME_MODE = "theme_mode"
+        /** 2026-11-01 — the selectable-theme key (an [AppTheme.key]). */
+        const val KEY_APP_THEME = "app_theme"
         private const val KEY_EXPORT_QUALITY = "export_quality"
         private const val KEY_AUTO_SAVE = "auto_save"
         private const val KEY_SNAP_TO_GRID = "snap_to_grid"

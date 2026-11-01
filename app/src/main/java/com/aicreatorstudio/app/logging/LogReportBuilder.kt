@@ -38,7 +38,7 @@ object LogReportBuilder {
      *
      * @param records retained diagnostic events (any order).
      * @param deviceSummary one non-identifying line, e.g.
-     *   `app=1.4.0 (4) android=35 abi=arm64-v8a device=…`.
+     *   `app=1.1 (5) android=35 abi=arm64-v8a device=…`.
      * @param generatedAtMillis wall clock for the header.
      */
     fun build(

@@ -16,6 +16,10 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.aicreatorstudio.app.ui.theme.accentBright
+import com.aicreatorstudio.app.ui.theme.accentDeep
+import com.aicreatorstudio.app.ui.theme.accentPrimary
+import com.aicreatorstudio.app.ui.theme.glowBrand
 import com.aicreatorstudio.app.ui.theme.GlassRegular
 import com.aicreatorstudio.app.ui.theme.GlassThick
 import com.aicreatorstudio.app.ui.theme.GlassThin
@@ -52,6 +56,10 @@ fun GlassSurface(
     content: @Composable () -> Unit
 ) {
     val tint = material.tint
+    // Read ONCE in composition: a DrawScope extension cannot call a
+    // @Composable, so the themed accent is resolved here and carried into
+    // the draw closure as a plain value.
+    val selectionAccent = accentPrimary()
     val borderColor = remember(borderOpacity) {
         Hairline.copy(alpha = Hairline.alpha * borderOpacity)
     }
@@ -62,7 +70,7 @@ fun GlassSurface(
             .background(tint)
             .drawBehind {
                 drawTopHighlight()
-                if (accentGlow) drawAccentGlow()
+                if (accentGlow) drawAccentGlow(selectionAccent)
             }
             .border(width = 1.dp, color = borderColor, shape = shape)
     ) {
@@ -116,8 +124,8 @@ private fun DrawScope.drawTopHighlight() {
 }
 
 /** Faint accent wash for the single selected state in a group. */
-private fun DrawScope.drawAccentGlow() {
-    val glow = AccentPrimary.copy(alpha = 0.08f)
+private fun DrawScope.drawAccentGlow(selectionAccent: Color) {
+    val glow = selectionAccent.copy(alpha = 0.08f)
     drawRect(glow)
 }
 

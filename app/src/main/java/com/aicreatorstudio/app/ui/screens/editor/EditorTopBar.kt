@@ -36,6 +36,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.aicreatorstudio.app.ui.components.GlassChrome
 import com.aicreatorstudio.app.ui.components.GlassMaterial
+import com.aicreatorstudio.app.ui.theme.accentBright
+import com.aicreatorstudio.app.ui.theme.accentDeep
+import com.aicreatorstudio.app.ui.theme.accentPrimary
+import com.aicreatorstudio.app.ui.theme.glowBrand
 import com.aicreatorstudio.app.ui.theme.AccentDeep
 import com.aicreatorstudio.app.ui.theme.HairlineSubtle
 import com.aicreatorstudio.app.ui.theme.LabelPrimary
@@ -179,7 +183,7 @@ private fun ExportPillButton(
         modifier = modifier
             .clip(RoundedCornerShape(percent = 50))
             .background(ctaBrush())
-            .border(1.dp, AccentDeep.copy(alpha = 0.35f), RoundedCornerShape(percent = 50))
+            .border(1.dp, accentDeep().copy(alpha = 0.35f), RoundedCornerShape(percent = 50))
             .clickable(
                 enabled = enabled,
                 role = Role.Button,

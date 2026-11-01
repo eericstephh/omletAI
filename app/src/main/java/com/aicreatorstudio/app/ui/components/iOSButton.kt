@@ -48,6 +48,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.aicreatorstudio.app.ui.theme.accentBright
+import com.aicreatorstudio.app.ui.theme.accentDeep
+import com.aicreatorstudio.app.ui.theme.accentPrimary
+import com.aicreatorstudio.app.ui.theme.glowBrand
 import com.aicreatorstudio.app.ui.theme.AccentBright
 import com.aicreatorstudio.app.ui.theme.AccentPrimary
 import com.aicreatorstudio.app.ui.theme.BorderSubtle
@@ -105,9 +109,9 @@ fun iOSPillButton(
             Color.White
         )
         iOSButtonStyle.Tinted -> Triple(
-            Brush.verticalGradient(listOf(AccentPrimary.copy(alpha = 0.20f), AccentPrimary.copy(alpha = 0.10f))),
-            AccentPrimary.copy(alpha = 0.38f),
-            AccentBright
+            Brush.verticalGradient(listOf(accentPrimary().copy(alpha = 0.20f), accentPrimary().copy(alpha = 0.10f))),
+            accentPrimary().copy(alpha = 0.38f),
+            accentBright()
         )
         iOSButtonStyle.Gray -> Triple(
             Brush.verticalGradient(listOf(CinematicHighest, CinematicElevated)),
@@ -234,7 +238,7 @@ fun iOSIconControl(
         Icon(
             imageVector = icon,
             contentDescription = contentDescription,
-            tint = if (selected) iOSBlueBright else tint,
+            tint = if (selected) accentBright() else tint,
             modifier = Modifier.size((sizeDp * 0.42f).dp)
         )
     }
@@ -256,7 +260,7 @@ fun iOSToolbarItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     selected: Boolean = false,
-    accentColor: Color = iOSBlue,
+    accentColor: Color = accentPrimary(),
     /**
      * Floor for the chip width. The default (64dp) keeps the original dock
      * sizing. The contextual toolbar passes `0.dp` because its row divides the
@@ -282,9 +286,9 @@ fun iOSToolbarItem(
 
     // Selected state uses the brand accent wash — not neon cyan — so the
     // legacy dock matches the contextual toolbar and the design tokens.
-    val selectedFill: Color = if (accentColor == iOSBlue) StateSelectedFill
+    val selectedFill: Color = if (accentColor == accentPrimary()) StateSelectedFill
         else accentColor.copy(alpha = 0.14f)
-    val selectedBorder: Color = if (accentColor == iOSBlue) StateSelectedBorder
+    val selectedBorder: Color = if (accentColor == accentPrimary()) StateSelectedBorder
         else accentColor.copy(alpha = 0.45f)
     val borderColor by animateColorAsState(
         targetValue = when {
@@ -360,7 +364,7 @@ fun iOSToolbarItem(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = if (selected) iOSBlueBright else LabelPrimary.copy(alpha = 0.92f),
+                    tint = if (selected) accentBright() else LabelPrimary.copy(alpha = 0.92f),
                     modifier = Modifier.size(glyphSize)
                 )
             }

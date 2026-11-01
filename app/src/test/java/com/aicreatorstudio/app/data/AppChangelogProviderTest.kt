@@ -195,33 +195,36 @@ class AppChangelogProviderTest {
     // ---- The feature this release is about ----
 
     @Test
-    fun `the newest release announces the notification bell itself`() {
-        // The current release is the one that adds this sheet, so it has to
-        // mention it — otherwise the first thing a user sees when they open
-        // the bell is a changelog that does not explain what the bell is.
+    fun `the current release announces the AI Persian subtitle correction`() {
+        // 2026-11-01 — the headline feature of the «1.1» store release. A
+        // changelog card that quietly loses it would defeat the reason the
+        // announcement exists at all.
         val bullets = AppChangelogProvider.currentRelease.features.joinToString(" ")
         assertTrue(
-            "the current release should mention the notification bell",
-            bullets.contains("زنگوله")
+            "the current release should mention the AI Persian subtitle correction",
+            bullets.contains("اصلاح هوشمند املای زیرنویس فارسی")
         )
     }
 
     @Test
-    fun `the newest release announces the four headline features`() {
-        // Pinned deliberately: these four are the substance of the release,
-        // and a changelog that quietly loses one is a changelog that lies.
+    fun `the current release announces the onboarding tutorial`() {
+        // The tutorial is the other user-visible addition of this release.
         val bullets = AppChangelogProvider.currentRelease.features.joinToString(" ")
-        val required = listOf(
-            "ردیابی حرکت" to "Motion Tracking",
-            "منحنی تغییر سرعت" to "Speed Ramping / Curves",
-            "ابعاد و کادر" to "automatic dimensions & framing",
-            "نوار ابزار" to "editor toolbar"
-        )
-        val missing = required.filterNot { (needle, _) -> bullets.contains(needle) }
         assertTrue(
-            "the current release is missing: " +
-                missing.joinToString { it.second },
-            missing.isEmpty()
+            "the current release should mention the onboarding tutorial",
+            bullets.contains("آموزش")
+        )
+    }
+
+    @Test
+    fun `the current release mentions the AI tool count`() {
+        // Pinned as a count, not as a list: the number must stay in sync
+        // with the real capability catalogue, and the sheet is the one
+        // place a user is told how many tools exist.
+        val bullets = AppChangelogProvider.currentRelease.features.joinToString(" ")
+        assertTrue(
+            "the current release should mention the AI tool set",
+            bullets.contains("۱۲ ابزار هوش مصنوعی")
         )
     }
 }

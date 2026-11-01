@@ -32,6 +32,10 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.aicreatorstudio.app.ui.theme.accentBright
+import com.aicreatorstudio.app.ui.theme.accentDeep
+import com.aicreatorstudio.app.ui.theme.accentPrimary
+import com.aicreatorstudio.app.ui.theme.glowBrand
 import com.aicreatorstudio.app.ui.theme.AccentBright
 import com.aicreatorstudio.app.ui.theme.BorderSubtle
 import com.aicreatorstudio.app.ui.theme.CinematicBlack
@@ -75,14 +79,14 @@ fun ComingSoonScreen(
                     modifier = Modifier
                         .size(72.dp)
                         .clip(RoundedCornerShape(20.dp))
-                        .background(AccentBright.copy(alpha = 0.10f))
-                        .border(1.dp, AccentBright.copy(alpha = 0.22f), RoundedCornerShape(20.dp)),
+                        .background(accentBright().copy(alpha = 0.10f))
+                        .border(1.dp, accentBright().copy(alpha = 0.22f), RoundedCornerShape(20.dp)),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = icon,
                         contentDescription = null,
-                        tint = AccentBright,
+                        tint = accentBright(),
                         modifier = Modifier.size(32.dp)
                     )
                 }

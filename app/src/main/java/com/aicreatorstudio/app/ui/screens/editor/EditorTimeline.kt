@@ -71,6 +71,10 @@ import com.aicreatorstudio.app.model.VideoClip
 import com.aicreatorstudio.app.model.VideoOverlay
 import com.aicreatorstudio.app.ui.components.GlassMaterial
 import com.aicreatorstudio.app.ui.components.GlassSurface
+import com.aicreatorstudio.app.ui.theme.accentBright
+import com.aicreatorstudio.app.ui.theme.accentDeep
+import com.aicreatorstudio.app.ui.theme.accentPrimary
+import com.aicreatorstudio.app.ui.theme.glowBrand
 import com.aicreatorstudio.app.ui.theme.HairlineSubtle
 import com.aicreatorstudio.app.ui.theme.LabelPrimary
 import com.aicreatorstudio.app.ui.theme.LabelSecondary
@@ -792,10 +796,10 @@ private fun TimelineHeader(
                 modifier = Modifier
                     .size(28.dp)
                     .clip(RoundedCornerShape(9.dp))
-                    .background(iOSBlue.copy(alpha = if (isAddingClip) 0.32f else 0.18f))
+                    .background(accentPrimary().copy(alpha = if (isAddingClip) 0.32f else 0.18f))
                     .border(
                         1.dp,
-                        iOSBlue.copy(alpha = 0.45f),
+                        accentPrimary().copy(alpha = 0.45f),
                         RoundedCornerShape(9.dp)
                     )
                     .clickable(enabled = !isAddingClip, onClick = onAddClip),
@@ -805,13 +809,13 @@ private fun TimelineHeader(
                     androidx.compose.material3.CircularProgressIndicator(
                         modifier = Modifier.size(14.dp),
                         strokeWidth = 2.dp,
-                        color = iOSBlueBright
+                        color = accentBright()
                     )
                 } else {
                     Icon(
                         imageVector = Icons.Filled.LibraryAdd,
                         contentDescription = "افزودن کلیپ",
-                        tint = iOSBlueBright,
+                        tint = accentBright(),
                         modifier = Modifier.size(16.dp)
                     )
                 }
@@ -1245,8 +1249,8 @@ private fun TrackRow(
                                         .width(18.dp)
                                         .fillMaxHeight()
                                         .clip(RoundedCornerShape(5.dp))
-                                        .background(iOSBlueBright.copy(alpha = 0.25f))
-                                        .border(1.dp, iOSBlueBright.copy(alpha = 0.5f), RoundedCornerShape(5.dp))
+                                        .background(accentBright().copy(alpha = 0.25f))
+                                        .border(1.dp, accentBright().copy(alpha = 0.5f), RoundedCornerShape(5.dp))
                                         .clickable {
                                             onClipSelected(clip.id)
                                             // The transition panel is already wired to
@@ -1259,7 +1263,7 @@ private fun TrackRow(
                                             .padding(2.dp)
                                             .background(
                                                 Brush.verticalGradient(
-                                                    listOf(iOSBlueBright, iOSBlue)
+                                                    listOf(accentBright(), accentPrimary())
                                                 ),
                                                 RoundedCornerShape(3.dp)
                                             )
@@ -1417,7 +1421,7 @@ private fun ClipBlock(
             .background(tileBackground)
             .border(
                 width = if (isSelected) 2.dp else 1.dp,
-                color = if (isSelected) AccentBright else color.copy(alpha = 0.55f),
+                color = if (isSelected) accentBright() else color.copy(alpha = 0.55f),
                 shape = RoundedCornerShape(EditorLayoutSpec.TimelineClipCornerRadius)
             )
             .clickable { onClick() }
@@ -2483,7 +2487,7 @@ private fun CenteredPlayheadOverlay(
                 .clip(RoundedCornerShape(5.dp))
                 .background(
                     Brush.verticalGradient(
-                        listOf(Color.White, AccentBright.copy(alpha = 0.9f))
+                        listOf(Color.White, accentBright().copy(alpha = 0.9f))
                     )
                 )
         )
@@ -2501,7 +2505,7 @@ private fun CenteredPlayheadOverlay(
                 .fillMaxHeight()
                 .background(
                     Brush.verticalGradient(
-                        listOf(AccentCyan, AccentPrimary)
+                        listOf(AccentCyan, accentPrimary())
                     )
                 )
         )

@@ -15,7 +15,7 @@ package com.aicreatorstudio.app.model
  *   badge compares against — see [hasUnreadUpdates]. Must be strictly
  *   greater than the [versionCode] of every later entry in the list, because
  *   the list is ordered newest-first.
- * @param versionName the human-readable version, e.g. `"1.4.0"`. Shown to the
+ * @param versionName the human-readable version, e.g. `"1.1"`. Shown to the
  *   user, never compared.
  * @param releaseDate a **pre-formatted, localised** date string (Persian
  *   calendar and Persian digits, e.g. `"۸ مهر ۱۴۰۵"`). Deliberately a

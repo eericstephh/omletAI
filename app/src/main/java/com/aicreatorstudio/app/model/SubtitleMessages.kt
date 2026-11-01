@@ -44,6 +44,55 @@ object SubtitleMessages {
     fun srtExportFailed(detail: String): String =
         "ذخیرهٔ فایل SRT ناموفق بود: $detail"
 
+    /**
+     * "Export SRT" was tapped on a timeline that carries no subtitle
+     * overlay at all (only decorative titles/watermarks).
+     *
+     * 2026-10-31 — previously this path reported [NO_SPEECH_FOUND_FA],
+     * which describes a GENERATION failure ("no transcribable audio in
+     * this video"). Reporting the wrong cause made a working export
+     * button look broken.
+     */
+    const val NO_SUBTITLES_TO_EXPORT_FA: String =
+        "زیرنویسی برای خروجی گرفتن وجود ندارد؛ اول زیرنویس بسازید یا فایل SRT وارد کنید"
+
+    /** The SAF destination could not be opened for writing. */
+    const val SRT_DESTINATION_UNAVAILABLE_FA: String =
+        "نوشتن در مقصد انتخاب‌شده ممکن نشد"
+
+    // ---- 2026-11-01 — Persian Subtitle AI Correction ----
+
+    /**
+     * "AI correction" was invoked on a timeline that carries no
+     * subtitle overlay at all.
+     *
+     * Distinct from [NO_SUBTITLES_TO_EXPORT_FA] on purpose: the user
+     * can act on the difference (generate subtitles first vs. export
+     * what is already there), and a single shared string would tell
+     * half of them the wrong thing.
+     */
+    const val NO_SUBTITLES_TO_CORRECT_FA: String =
+        "زیرنویسی برای اصلاح وجود ندارد؛ اول زیرنویس بسازید یا فایل SRT وارد کنید"
+
+    /**
+     * The one-time privacy notice shown before the FIRST correction
+     * request. The correction stage uploads subtitle TEXT — the audio
+     * path already uploads audio, but a user who picked the fully
+     * offline Whisper model has never sent anything to a server, so
+     * this must be stated rather than assumed.
+     */
+    const val CORRECTION_PRIVACY_NOTICE_FA: String =
+        "برای اصلاح هوشمند، متن زیرنویس‌ها به سرویس Groq ارسال می‌شود. " +
+            "صدا و تصویر ویدیو ارسال نمی‌شود و نتیجه فقط پس از تأیید شما روی پروژه اعمال می‌شود. " +
+            "استفاده از این سرویس رایگان نیست و به سهمیهٔ حساب Groq شما بستگی دارد."
+
+    /** Section heading for the correction controls in the Subs card. */
+    const val CORRECTION_TITLE_FA: String = "اصلاح هوشمند فارسی"
+
+    /** One-line explanation under the heading. */
+    const val CORRECTION_SUBTITLE_FA: String =
+        "غلط‌های املایی و نیم‌فاصله را اصلاح می‌کند؛ زمان‌بندی زیرنویس دست نمی‌خورد"
+
     /** No clip was selected and the project has no media at all. */
     const val NO_MEDIA_SELECTED_FA: String =
         "هیچ ویدیویی برای این کار انتخاب نشده است"

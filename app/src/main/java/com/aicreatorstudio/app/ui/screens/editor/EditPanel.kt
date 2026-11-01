@@ -70,6 +70,10 @@ import com.aicreatorstudio.app.model.TextOverlay
 import com.aicreatorstudio.app.ai.AiModelStatus
 import com.aicreatorstudio.app.ai.SubtitleGenerationState
 import com.aicreatorstudio.app.ai.WhisperModelSpec
+// 2026-11-01 — PERSIAN SUBTITLE AI CORRECTION.
+import com.aicreatorstudio.app.ai.groq.GroqChatModels
+import com.aicreatorstudio.app.ai.subtitle.correction.AiCorrectionState
+import com.aicreatorstudio.app.model.SubtitleMessages
 import com.aicreatorstudio.app.model.VideoClip
 
 /**
@@ -317,6 +321,19 @@ fun AISubtitleCard(
     onApplySubtitleStyle: (String, com.aicreatorstudio.app.model.SubtitleStyle) -> Unit = { _, _ -> },
     onApplySubtitleStyleToAll: (com.aicreatorstudio.app.model.SubtitleStyle) -> Unit = {},
     hasSubtitles: Boolean = false,
+    /**
+     * 2026-11-01 — PERSIAN SUBTITLE AI CORRECTION.
+     *
+     * ONE bundled parameter rather than seven: the host's
+     * sub-panel dispatch is a large `when` inside a composable whose
+     * generated method is already near the JVM's 64 KB limit, and every
+     * extra argument there is another chance to overflow it. See
+     * [SubtitleCorrectionUi].
+     *
+     * Defaults are inert, so a card composed without a provider renders
+     * a correction row that does nothing rather than crashing.
+     */
+    correction: SubtitleCorrectionUi = SubtitleCorrectionUi(),
     /** 2026-09-11 — what the next Generate will transcribe: the
      *  tapped audio file's name, or the video clip's. Null hides
      *  the chip. */
@@ -337,6 +354,10 @@ fun AISubtitleCard(
     // the dialog just tells them how many will be replaced.
     var showRegenerateDialog by remember { mutableStateOf(false) }
     var showDeleteAllDialog by remember { mutableStateOf(false) }
+    // 2026-11-01 — the one-time "subtitle text leaves the device"
+    // notice. Shown before the FIRST correction request only; the
+    // acknowledgement is persisted in GroqApiKeyStore.
+    var showCorrectionDisclosureDialog by remember { mutableStateOf(false) }
     // Inline editor state for the selected AI subtitle. Initialised
     // from the selected overlay's text; the user can edit, then Save
     // or Cancel. Saving calls `onUpdateTextOverlay(id, newText)`
@@ -1030,6 +1051,213 @@ fun AISubtitleCard(
                 }
             }
 
+            // ==================================================
+            // 2026-11-01 — PERSIAN SUBTITLE AI CORRECTION
+            //
+            // Opt-in only. Nothing here runs on its own: the stage
+            // starts from this button, the result lands in a review
+            // dialog, and the project is written ONLY on accept.
+            //
+            // The row is hidden when there is no subtitle at all
+            // (`hasGeneratedSubtitles`), because "correct my
+            // subtitles" with zero subtitles is a dead end.
+            // ==================================================
+            if (hasGeneratedSubtitles) {
+                // Read once: the row is a pure function of these.
+                val correctionState = correction.state
+                val correctionModelId = correction.modelId
+                val correctionActions = correction.actions
+                Spacer(Modifier.height(14.dp))
+                Text(
+                    text = SubtitleMessages.CORRECTION_TITLE_FA,
+                    style = MaterialTheme.typography.titleSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                )
+                Spacer(Modifier.height(2.dp))
+                Text(
+                    text = SubtitleMessages.CORRECTION_SUBTITLE_FA,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                )
+
+                // The model picker is editable only while no request is
+                // in flight: swapping the model mid-run would make the
+                // progress bar describe a different request than the
+                // one actually executing.
+                val correctionIdle = correctionState is AiCorrectionState.Idle ||
+                    correctionState is AiCorrectionState.Applied ||
+                    correctionState is AiCorrectionState.Error
+                if (correctionIdle) {
+                    Spacer(Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        GroqChatModels.CATALOG.forEach { model ->
+                            val selected = model.id == correctionModelId
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(
+                                        if (selected) {
+                                            MaterialTheme.colorScheme.primary.copy(alpha = 0.18f)
+                                        } else {
+                                            Color.Transparent
+                                        }
+                                    )
+                                    .border(
+                                        width = 1.dp,
+                                        color = if (selected) {
+                                            MaterialTheme.colorScheme.primary
+                                        } else {
+                                            MaterialTheme.colorScheme.onPrimaryContainer
+                                                .copy(alpha = 0.25f)
+                                        },
+                                        shape = RoundedCornerShape(12.dp)
+                                    )
+                                    .clickable { correctionActions.onSelectModel(model.id) }
+                                    .padding(horizontal = 10.dp, vertical = 6.dp)
+                            ) {
+                                Text(
+                                    text = model.label,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = GroqChatModels.entryFor(correctionModelId).hint,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
+                    )
+                }
+
+                Spacer(Modifier.height(10.dp))
+                when (val cs = correctionState) {
+                    is AiCorrectionState.Running -> {
+                        Text(
+                            text = cs.label,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(Modifier.height(6.dp))
+                        val fraction = cs.fraction
+                        if (fraction != null) {
+                            LinearProgressIndicator(
+                                progress = { fraction },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        } else {
+                            LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                        }
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = correctionActions.onCancel,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            )
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Cancel,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text("لغو اصلاح")
+                        }
+                    }
+
+                    is AiCorrectionState.Review -> {
+                        // The review dialog is hosted by the screen, not
+                        // by this card, so it survives the user closing
+                        // the sub-panel while reading the diff.
+                        Text(
+                            text = "‏${cs.preview.items.size} مورد برای بازبینی آماده است",
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+
+                    is AiCorrectionState.Error -> {
+                        Text(
+                            text = cs.message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                        if (cs.retryable) {
+                            Spacer(Modifier.height(8.dp))
+                            OutlinedButton(
+                                onClick = correctionActions.onStart,
+                                modifier = Modifier.fillMaxWidth()
+                            ) { Text("تلاش دوباره") }
+                        }
+                    }
+
+                    is AiCorrectionState.Applied -> {
+                        Text(
+                            text = if (cs.changed == 0) {
+                                "موردی برای اصلاح پیدا نشد؛ متن زیرنویس دست‌نخورده ماند"
+                            } else {
+                                "‏${cs.changed} زیرنویس اصلاح شد" +
+                                    if (cs.retimed > 0) {
+                                        " (زمان‌بندی کلمات ${cs.retimed} مورد بازچینش شد)"
+                                    } else ""
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(Modifier.height(8.dp))
+                        OutlinedButton(
+                            onClick = correctionActions.onStart,
+                            modifier = Modifier.fillMaxWidth()
+                        ) { Text("اصلاح دوباره") }
+                    }
+
+                    is AiCorrectionState.Idle -> {
+                        Button(
+                            onClick = {
+                                if (correction.disclosureAcknowledged) {
+                                    correctionActions.onStart()
+                                } else {
+                                    // First run: state the upload before
+                                    // spending a request.
+                                    showCorrectionDisclosureDialog = true
+                                }
+                            },
+                            // Disabled while Whisper is running: the two
+                            // passes read the same overlay list, and a
+                            // generation that lands mid-review would
+                            // replace the very captions under review.
+                            enabled = hasGroqApiKey && state.isTerminal,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.AutoAwesome,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(Modifier.width(6.dp))
+                            Text("اصلاح با هوش مصنوعی")
+                        }
+                        if (!hasGroqApiKey) {
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                text = "برای این قابلیت، کلید Groq را در «تنظیمات ← اتصال هوش مصنوعی» وارد کنید",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.65f)
+                            )
+                        }
+                    }
+                }
+            }
+
             // PHASE B3 — "Delete all AI subtitles" affordance.
             // Only enabled when there is something to delete. Goes
             // through a confirm dialog so an accidental tap does
@@ -1158,6 +1386,27 @@ fun AISubtitleCard(
                 )
             }
         }
+    }
+
+    // ----- 2026-11-01 AI-correction privacy notice (first run only) -----
+    if (showCorrectionDisclosureDialog) {
+        AlertDialog(
+            onDismissRequest = { showCorrectionDisclosureDialog = false },
+            title = { Text(SubtitleMessages.CORRECTION_TITLE_FA) },
+            text = { Text(SubtitleMessages.CORRECTION_PRIVACY_NOTICE_FA) },
+            confirmButton = {
+                TextButton(onClick = {
+                    showCorrectionDisclosureDialog = false
+                    correction.actions.onAcknowledge()
+                    correction.actions.onStart()
+                }) { Text("متوجه شدم، ادامه") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showCorrectionDisclosureDialog = false }) {
+                    Text("انصراف")
+                }
+            }
+        )
     }
 
     // ----- Regenerate confirmation dialog -----

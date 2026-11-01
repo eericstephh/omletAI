@@ -57,7 +57,19 @@ class SubtitleMessagesGuardTest {
             "AiTool.COMPLETED_FA" to SubtitleMessages.AiTool.COMPLETED_FA,
             "AiTool.UNKNOWN_ERROR_FA" to SubtitleMessages.AiTool.UNKNOWN_ERROR_FA,
             // 2026-10-13 — the transport banner for an empty timeline.
-            "Playback.NOTHING_TO_PLAY_FA" to SubtitleMessages.Playback.NOTHING_TO_PLAY_FA
+            "Playback.NOTHING_TO_PLAY_FA" to SubtitleMessages.Playback.NOTHING_TO_PLAY_FA,
+            // 2026-10-31 — SRT export now reports its own causes instead
+            // of borrowing the generation-failure text.
+            "NO_SUBTITLES_TO_EXPORT_FA" to SubtitleMessages.NO_SUBTITLES_TO_EXPORT_FA,
+            "SRT_DESTINATION_UNAVAILABLE_FA" to SubtitleMessages.SRT_DESTINATION_UNAVAILABLE_FA,
+            // 2026-11-01 — Persian Subtitle AI Correction. The privacy
+            // notice is the highest-stakes string in this file: if it
+            // ever degrades to `???`, the user is asked to approve a
+            // text upload they cannot read.
+            "NO_SUBTITLES_TO_CORRECT_FA" to SubtitleMessages.NO_SUBTITLES_TO_CORRECT_FA,
+            "CORRECTION_PRIVACY_NOTICE_FA" to SubtitleMessages.CORRECTION_PRIVACY_NOTICE_FA,
+            "CORRECTION_TITLE_FA" to SubtitleMessages.CORRECTION_TITLE_FA,
+            "CORRECTION_SUBTITLE_FA" to SubtitleMessages.CORRECTION_SUBTITLE_FA
         )
     }
 

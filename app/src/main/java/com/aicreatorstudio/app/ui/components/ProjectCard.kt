@@ -45,13 +45,19 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.aicreatorstudio.app.model.VideoProject
+import com.aicreatorstudio.app.ui.theme.accentBright
+import com.aicreatorstudio.app.ui.theme.accentDeep
+import com.aicreatorstudio.app.ui.theme.accentPrimary
+import com.aicreatorstudio.app.ui.theme.glowBrand
 import com.aicreatorstudio.app.ui.theme.AccentBright
-import com.aicreatorstudio.app.ui.theme.BorderSubtle
 import com.aicreatorstudio.app.ui.theme.CinematicElevated
-import com.aicreatorstudio.app.ui.theme.CinematicSurface
+import com.aicreatorstudio.app.ui.theme.HairlineSubtle
 import com.aicreatorstudio.app.ui.theme.LabelPrimary
 import com.aicreatorstudio.app.ui.theme.LabelSecondary
+import com.aicreatorstudio.app.ui.theme.LabelTertiary
 import com.aicreatorstudio.app.ui.theme.StatusError
+import com.aicreatorstudio.app.ui.theme.cardBrush
+import com.aicreatorstudio.app.ui.theme.cardEdgeBrush
 import com.aicreatorstudio.app.util.Formatters
 
 /**
@@ -88,9 +94,9 @@ fun ProjectCard(
         modifier = modifier
             .fillMaxWidth()
             .scale(scale)
-            .clip(RoundedCornerShape(18.dp))
-            .background(CinematicSurface)
-            .border(1.dp, BorderSubtle, RoundedCornerShape(18.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .background(cardBrush())
+            .border(1.dp, cardEdgeBrush(), RoundedCornerShape(20.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null
@@ -118,7 +124,7 @@ fun ProjectCard(
             Spacer(Modifier.height(3.dp))
             Text(
                 text = meta,
-                color = LabelSecondary,
+                color = LabelTertiary,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -142,10 +148,10 @@ fun ProjectCard(
 private fun ProjectThumbnail(uri: String?) {
     Box(
         modifier = Modifier
-            .size(56.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .size(60.dp)
+            .clip(RoundedCornerShape(14.dp))
             .background(CinematicElevated)
-            .border(1.dp, BorderSubtle, RoundedCornerShape(12.dp)),
+            .border(1.dp, HairlineSubtle, RoundedCornerShape(14.dp)),
         contentAlignment = Alignment.Center
     ) {
         ProjectThumbnailFrame(
@@ -158,8 +164,8 @@ private fun ProjectThumbnail(uri: String?) {
                         .background(
                             Brush.verticalGradient(
                                 listOf(
-                                    AccentBright.copy(alpha = 0.16f),
-                                    AccentBright.copy(alpha = 0.04f)
+                                    accentBright().copy(alpha = 0.16f),
+                                    accentBright().copy(alpha = 0.04f)
                                 )
                             )
                         ),
@@ -168,7 +174,7 @@ private fun ProjectThumbnail(uri: String?) {
                     Icon(
                         imageVector = Icons.Filled.Movie,
                         contentDescription = null,
-                        tint = AccentBright,
+                        tint = accentBright(),
                         modifier = Modifier.size(24.dp)
                     )
                 }
