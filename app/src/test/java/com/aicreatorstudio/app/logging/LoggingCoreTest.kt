@@ -130,57 +130,6 @@ class LoggingCoreTest {
         assertEquals(listOf(2), doomed.map { it.generation })
     }
 
-    // ---- 4. Report assembly ----
-
-    @Test
-    fun `report carries header, counts and the latest problem`() {
-        val records = listOf(
-            record(LogLevel.INFO, event = "a", message = "started"),
-            record(LogLevel.ERROR, event = "b", message = "boom"),
-            record(LogLevel.WARN, event = "c", message = "careful")
-        )
-        val report = LogReportBuilder.build(
-            records = records,
-            deviceSummary = "app=1.0 (1) android=35 abi=arm64-v8a",
-            generatedAtMillis = 1_700_000_000_000L
-        )
-        assertTrue(report.contains("events: total=3 error=1 warn=1"))
-        assertTrue(report.contains("Latest problem"))
-        assertTrue(report.contains("boom"))   // latest problem is the WARN? No — ERROR is later.
-        assertTrue(report.contains("careful"))
-        assertTrue(report.contains("app=1.0 (1)"))
-    }
-
-    @Test
-    fun `report caps the number of events but keeps the newest`() {
-        val many = (1..50).map { record(LogLevel.INFO, event = "e$it", message = "m$it") }
-        val report = LogReportBuilder.build(
-            records = many,
-            deviceSummary = "x",
-            generatedAtMillis = 0L,
-            maxEvents = 10
-        )
-        assertTrue(report.contains("retainedInReport=10"))
-        assertTrue(report.contains("e50"))   // newest kept
-        assertFalse(report.contains(" e1 ")) // oldest dropped from the listing
-    }
-
-    // ---- 5. Sanitizer defense-in-depth at report time ----
-
-    @Test
-    fun `report re-sanitizes a path that slipped into a message`() {
-        val leaky = LogRecord(
-            timestampMillis = 1L,
-            level = LogLevel.ERROR,
-            component = "export",
-            event = "export_failed",
-            message = "failed at /storage/emulated/0/Movies/private/vacation.mp4"
-        )
-        val report = LogReportBuilder.build(listOf(leaky), "x", 0L)
-        assertTrue(report.contains("vacation.mp4"))
-        assertFalse(report.contains("/storage/emulated"))
-    }
-
     private fun record(
         level: LogLevel,
         event: String = "evt",

@@ -142,39 +142,3 @@ data class LogFile(
     val generation: Int,
     val sizeBytes: Long
 )
-
-/**
- * 2026-10-12 — pure view-model for the diagnostics screen.
- *
- * Kept as a top-level `data class` with a pure factory ([summarize]) so
- * the filter and summary logic is JVM-testable without constructing a
- * Hilt ViewModel (which the project's test stack cannot do). The
- * ViewModel simply holds this and exposes it as state.
- */
-data class DiagnosticsSummary(
-    val records: List<LogRecord> = emptyList(),
-    val problemsOnly: Boolean = false,
-    val latestProblem: LogRecord? = null,
-    val totalCount: Int = 0,
-    val errorCount: Int = 0,
-    val warnCount: Int = 0
-) {
-    /** What the list should render under the current filter. */
-    val visibleRecords: List<LogRecord>
-        get() = if (problemsOnly) records.filter { it.isProblem } else records
-
-    companion object {
-        /** Builds a summary from retained records, oldest-first. */
-        fun summarize(records: List<LogRecord>, problemsOnly: Boolean): DiagnosticsSummary {
-            val ordered = records.sortedBy { it.timestampMillis }
-            return DiagnosticsSummary(
-                records = ordered,
-                problemsOnly = problemsOnly,
-                latestProblem = ordered.lastOrNull { it.isProblem },
-                totalCount = ordered.size,
-                errorCount = ordered.count { it.level == LogLevel.ERROR },
-                warnCount = ordered.count { it.level == LogLevel.WARN }
-            )
-        }
-    }
-}

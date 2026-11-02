@@ -48,9 +48,6 @@ class DiagnosticsWiringTest {
     private fun app() =
         lines("src/main/java/com/aicreatorstudio/app/AICreatorStudioApp.kt")
 
-    private fun panel() =
-        lines("src/main/java/com/aicreatorstudio/app/ui/screens/settings/DiagnosticsSection.kt")
-
     // ---- producers ------------------------------------------------------
 
     @Test
@@ -110,24 +107,6 @@ class DiagnosticsWiringTest {
         val attachIdx = appSrc.indexOfFirst { it.contains("CrashReporter.attachLog(omeletLog)") }
         val installIdx = appSrc.indexOfFirst { it.contains("CrashReporter.install(this)") }
         assertTrue("attachLog must be called", attachIdx >= 0)
-        assertTrue("attachLog must precede install()", installIdx > attachIdx)    }
-
-    // ---- visibility -----------------------------------------------------
-
-    @Test
-    fun `the panel re-reads on resume`() {
-        val src = panel()
-        assertTrue(
-            "the panel must observe the lifecycle",
-            src.any { it.contains("val lifecycleOwner = LocalLifecycleOwner.current") }
-        )
-        assertTrue(
-            "and refresh on ON_RESUME",
-            src.any { it.contains("Lifecycle.Event.ON_RESUME") && it.contains("viewModel.refresh()") }
-        )
-        assertTrue(
-            "the observer must be removed on dispose",
-            src.any { it.contains("lifecycleOwner.lifecycle.removeObserver(observer)") }
-        )
+        assertTrue("attachLog must precede install()", installIdx > attachIdx)
     }
 }

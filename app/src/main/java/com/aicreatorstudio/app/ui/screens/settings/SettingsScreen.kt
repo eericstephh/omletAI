@@ -220,19 +220,6 @@ fun SettingsScreen(
 
             item { Spacer(modifier = Modifier.height(8.dp)) }
 
-            // 2026-10-12 — «گزارش‌های فنی»: local, account-free
-            // diagnostics. Views the sanitized events the centralized
-            // logger retains, filters to problems, and exports a report
-            // through the native share sheet after an explicit warning.
-            // Nothing here uploads or makes a network call.
-            item {
-                val diagnosticsVm: com.aicreatorstudio.app.viewmodel.DiagnosticsViewModel =
-                    hiltViewModel()
-                DiagnosticsSection(viewModel = diagnosticsVm)
-            }
-
-            item { Spacer(modifier = Modifier.height(8.dp)) }
-
             item {
                 SettingsSection(title = t("عمومی")) {
                     SettingsToggleItem(
